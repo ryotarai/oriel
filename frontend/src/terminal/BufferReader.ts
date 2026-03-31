@@ -36,8 +36,9 @@ export function extractLines(buffer: BufferLike): ScreenLine[] {
       const cell = line.getCell(x);
       if (!cell) continue;
 
-      const char = cell.getChars();
-      if (char === "" && x > 0) continue;
+      let char = cell.getChars();
+      // Empty cells (from cursor movement) should be treated as spaces
+      if (char === "") char = " ";
 
       const fg = cell.isFgDefault() ? null : cell.getFgColor();
       const bg = cell.isBgDefault() ? null : cell.getBgColor();

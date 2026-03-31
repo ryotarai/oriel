@@ -75,7 +75,7 @@ export default function App() {
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-16">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-24">
         {blocks.map((block, i) => (
           <BlockRenderer key={`${block.type}-${i}`} block={block} />
         ))}

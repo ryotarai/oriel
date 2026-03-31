@@ -295,26 +295,15 @@ function isCollapsedToolInfo(line: ScreenLine): boolean {
 // --- Sub-detection within assistant response blocks ---
 
 function subDetectAssistantContent(lines: ScreenLine[]): Block[] {
-  const blocks: Block[] = [];
-
-  // Check if the first line is an H1 heading (bold+italic+underline on ● line)
-  const firstLine = lines[0];
-  if (firstLine && isAssistantResponseStart(firstLine)) {
-    const hasH1 = firstLine.spans.some(
-      (s) => s.bold && s.italic && s.underline && s.text.trim().length > 0
-    );
-    if (hasH1) {
-      // This is a heading-style response start; we'll detect sub-blocks
-      return detectSubBlocks(lines);
-    }
+  // Always try sub-detection — even responses without H1 headings
+  // can contain bullets, code blocks, H2 headings, etc.
+  if (lines.length > 1) {
+    const subBlocks = detectSubBlocks(lines);
+    if (subBlocks.length > 0) return subBlocks;
   }
 
-  // Simple assistant response (no sub-structure)
-  blocks.push({
-    type: "assistant-text",
-    lines,
-  });
-  return blocks;
+  // Single-line or no sub-structure detected
+  return [{ type: "assistant-text", lines }];
 }
 
 function detectSubBlocks(lines: ScreenLine[]): Block[] {
@@ -332,6 +321,13 @@ function detectSubBlocks(lines: ScreenLine[]): Block[] {
       )
     ) {
       blocks.push({ type: "heading", lines: [line], meta: { level: 1 } });
+      i++;
+      continue;
+    }
+
+    // Assistant response start line (● fg=231) without H1 formatting
+    if (isAssistantResponseStart(line)) {
+      blocks.push({ type: "assistant-text", lines: [line] });
       i++;
       continue;
     }
