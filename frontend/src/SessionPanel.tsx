@@ -43,6 +43,12 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
   const dragging = useRef(false);
   const [activeTab, setActiveTab] = useState<"conversation" | "diff" | "files">("conversation");
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
+  const [fileToOpen, setFileToOpen] = useState<string | null>(null);
+
+  const openFileInExplorer = useCallback((path: string) => {
+    setFileToOpen(path);
+    setActiveTab("files");
+  }, []);
 
   // Resume modal
   const [showResumeModal, setShowResumeModal] = useState(false);
@@ -301,7 +307,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
                 </div>
               )}
               {entries.map((entry) => (
-                <MessageBubble key={entry.uuid} entry={entry} />
+                <MessageBubble key={entry.uuid} entry={entry} onOpenFile={openFileInExplorer} />
               ))}
               <div ref={chatEndRef} />
             </div>
@@ -312,7 +318,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-            <FileExplorer />
+            <FileExplorer requestedPath={fileToOpen} />
           </div>
         )}
       </div>
@@ -433,7 +439,7 @@ function BashBlock({ parts }: { parts: BashParts }) {
   );
 }
 
-function MessageBubble({ entry }: { entry: ConversationEntry }) {
+function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   if (entry.type === "tool_use") {
     return <ToolUseBlock entry={entry} />;
   }
@@ -481,6 +487,29 @@ function MessageBubble({ entry }: { entry: ConversationEntry }) {
           a: ({ children, ...props }) => (
             <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>
           ),
+          code: ({ children, className, ...props }) => {
+            // For code blocks (has language class), use default rendering
+            if (className) {
+              return <code className={className} {...props}>{children}</code>;
+            }
+            // For inline code, check if it looks like a file path
+            const text = typeof children === "string" ? children : String(children ?? "");
+            if (onOpenFile && isFilePath(text)) {
+              // Strip line number suffix like :42
+              const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
+              return (
+                <code
+                  className="cursor-pointer hover:underline hover:text-blue-300"
+                  onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+                  title="Open in File Explorer"
+                  {...props}
+                >
+                  {children}
+                </code>
+              );
+            }
+            return <code {...props}>{children}</code>;
+          },
         }}
       >
         {entry.text}
@@ -590,6 +619,20 @@ function toolUseSummary(name: string, inputJson: string): string {
   } catch {
     return "";
   }
+}
+
+function isFilePath(text: string): boolean {
+  // Strip trailing line number like :42 or :42-50
+  const cleaned = text.replace(/:\d+(-\d+)?$/, "");
+  // Must contain a slash or dot-extension, look like a relative or absolute path
+  if (!cleaned.includes("/") && !cleaned.includes(".")) return false;
+  // Must not contain spaces (file paths in code rarely have spaces)
+  if (cleaned.includes(" ")) return false;
+  // Must have a file extension or end with a dir-like path
+  if (/\.\w{1,10}$/.test(cleaned)) return true;
+  // Paths like src/components/ or internal/ws
+  if (/^[\w./-]+$/.test(cleaned) && cleaned.includes("/")) return true;
+  return false;
 }
 
 function formatToolInput(inputJson: string): string {

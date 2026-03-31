@@ -8,10 +8,11 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-export function FileExplorer() {
+export function FileExplorer({ requestedPath }: { requestedPath?: string | null }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -21,6 +22,13 @@ export function FileExplorer() {
       .catch(() => {});
   }, []);
 
+  // Open file when requested externally
+  useEffect(() => {
+    if (requestedPath && requestedPath !== selectedPath) {
+      openFile(requestedPath);
+    }
+  }, [requestedPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const openFile = useCallback((path: string) => {
     setSelectedPath(path);
     setLoading(true);
@@ -28,6 +36,7 @@ export function FileExplorer() {
       .then((r) => r.json())
       .then((data) => {
         setFileContent(data.content);
+        setIsBinary(data.isBinary ?? false);
         setLoading(false);
       })
       .catch(() => {
@@ -68,7 +77,13 @@ export function FileExplorer() {
                 {selectedPath}
               </div>
               <div className="flex-1 overflow-auto">
-                <HighlightedCode content={fileContent ?? ""} path={selectedPath} />
+                {isBinary ? (
+                  <div className="text-gray-500 text-sm p-4 flex items-center justify-center h-full">
+                    Binary file
+                  </div>
+                ) : (
+                  <HighlightedCode content={fileContent ?? ""} path={selectedPath} />
+                )}
               </div>
             </div>
           )
@@ -197,7 +212,7 @@ function HighlightedCode({ content, path }: { content: string; path: string }) {
   }
 
   return (
-    <pre className="text-xs font-mono p-3 leading-relaxed">
+    <pre className="text-xs font-mono p-3 leading-relaxed text-gray-200">
       <code dangerouslySetInnerHTML={{ __html: html }} />
     </pre>
   );
