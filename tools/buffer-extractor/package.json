@@ -1,0 +1,17 @@
+{
+  "name": "buffer-extractor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@xterm/headless": "^6.0.0",
+    "@xterm/xterm": "^6.0.0"
+  }
+}

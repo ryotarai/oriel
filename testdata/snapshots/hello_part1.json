@@ -1,0 +1,461 @@
+{
+  "name": "hello_part1",
+  "description": "Screen state at ~20% of output",
+  "cols": 120,
+  "rows": 40,
+  "lines": [
+    {
+      "lineNumber": 0,
+      "text": "╭───ClaudeCodev2.1.87──────────────────────────────────────────────────────────────────────────────────────────────╮",
+      "spans": [
+        {
+          "text": "╭───ClaudeCode",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "v2.1.87",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "──────────────────────────────────────────────────────────────────────────────────────────────╮",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 1,
+      "text": "││Tipsforgettingstarted│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Tipsforgettingstarted",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 2,
+      "text": "│WelcomebackRyota!│Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "WelcomebackRyota!",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 3,
+      "text": "││───────────────────────────────────────────────────────────────│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "───────────────────────────────────────────────────────────────│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 4,
+      "text": "│▐▛███▜▌│Recentactivity│",
+      "spans": [
+        {
+          "text": "│▐",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛███▜",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▌",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Recentactivity",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 5,
+      "text": "│▝▜█████▛▘│Norecentactivity│",
+      "spans": [
+        {
+          "text": "│▝▜",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "█████",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛▘",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Norecentactivity",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 6,
+      "text": "│▘▘▝▝││",
+      "spans": [
+        {
+          "text": "│▘▘▝▝",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 7,
+      "text": "│Opus4.6(1Mcontext)·ClaudeMax·││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Opus4.6(1Mcontext)·ClaudeMax·",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 8,
+      "text": "│r-arai@mercari.com'sOrganization││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "r-arai@mercari.com'sOrganization",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 9,
+      "text": "│/…/src/github.com/ryotarai/claude-code-wrapper-ui││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "/…/src/github.com/ryotarai/claude-code-wrapper-ui",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 10,
+      "text": "╰─────────────────────────────────────────────────────────",
+      "spans": [
+        {
+          "text": "╰─────────────────────────────────────────────────────────",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    }
+  ]
+}

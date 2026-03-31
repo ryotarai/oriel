@@ -1,0 +1,1370 @@
+{
+  "name": "diff_final",
+  "description": "Final screen state after all output",
+  "cols": 120,
+  "rows": 40,
+  "lines": [
+    {
+      "lineNumber": 0,
+      "text": "╭───ClaudeCodev2.1.87──────────────────────────────────────────────────────────────────────────────────────────────╮",
+      "spans": [
+        {
+          "text": "╭───ClaudeCode",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "v2.1.87",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "──────────────────────────────────────────────────────────────────────────────────────────────╮",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 1,
+      "text": "││Tipsforgettingstarted│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Tipsforgettingstarted",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 2,
+      "text": "│WelcomebackRyota!│Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "WelcomebackRyota!",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 3,
+      "text": "││───────────────────────────────────────────────────────────────│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "───────────────────────────────────────────────────────────────│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 4,
+      "text": "│▐▛███▜▌│Recentactivity│",
+      "spans": [
+        {
+          "text": "│▐",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛███▜",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▌",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Recentactivity",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 5,
+      "text": "│▝▜█████▛▘│Norecentactivity│",
+      "spans": [
+        {
+          "text": "│▝▜",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "█████",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛▘",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Norecentactivity",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 6,
+      "text": "│▘▘▝▝││",
+      "spans": [
+        {
+          "text": "│▘▘▝▝",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 7,
+      "text": "│Opus4.6(1Mcontext)·ClaudeMax·││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Opus4.6(1Mcontext)·ClaudeMax·",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 8,
+      "text": "│r-arai@mercari.com'sOrganization││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "r-arai@mercari.com'sOrganization",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 9,
+      "text": "│/…/src/github.com/ryotarai/claude-code-wrapper-ui││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "/…/src/github.com/ryotarai/claude-code-wrapper-ui",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 10,
+      "text": "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+      "spans": [
+        {
+          "text": "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 11,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 12,
+      "text": "❯ create a file called /tmp/testfile_for_capture.txt with the content 'hello world' in it                               ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 239,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "create a file called /tmp/testfile_for_capture.txt with the content 'hello world' in it",
+          "fg": 231,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                               ",
+          "fg": null,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 13,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 14,
+      "text": "●Write(/tmp/testfile_for_capture.txt)",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 114,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Write",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "(/tmp/testfile_for_capture.txt)",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 15,
+      "text": " ⎿ Wrote1linesto../../../../../../tmp/testfile_for_capture.txt",
+      "spans": [
+        {
+          "text": " ⎿ ",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Wrote",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "1",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "linesto",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "../../../../../../tmp/testfile_for_capture.txt",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 16,
+      "text": " 1helloworld",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " 1",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "helloworld",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 17,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 18,
+      "text": "●Done.Created/tmp/testfile_for_capture.txtwithhelloworld.",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Done.Created",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "/tmp/testfile_for_capture.txt",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "with",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "helloworld",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": ".",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 19,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 20,
+      "text": "❯ y                                                                                                                     ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 239,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "y",
+          "fg": 231,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                                     ",
+          "fg": null,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 21,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 22,
+      "text": "●Thefilewasalreadycreatedsuccessfully.Isthereanythingelseyouneed?",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Thefilewasalreadycreatedsuccessfully.Isthereanythingelseyouneed?",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 23,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 24,
+      "text": "❯ now edit /tmp/testfile_for_capture.txt and change 'hello world' to 'goodbye world' and add a second line 'foo bar'    ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 239,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "now edit /tmp/testfile_for_capture.txt and change 'hello world' to 'goodbye world' and add a second line 'foo bar'",
+          "fg": 231,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "    ",
+          "fg": null,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 25,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 26,
+      "text": "Read1 file(ctrl+otoexpand)",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Read",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "1",
+          "fg": 246,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " file(ctrl+otoexpand)",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 27,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 28,
+      "text": "●Update(/tmp/testfile_for_capture.txt)",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 114,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Update",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "(/tmp/testfile_for_capture.txt)",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 29,
+      "text": " ⎿ Added2lines,removed1line",
+      "spans": [
+        {
+          "text": " ⎿ ",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Added",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "2",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "lines,removed",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "1",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "line",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 30,
+      "text": " 1 -hello world                                                                                             ",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " 1 -",
+          "fg": 14441050,
+          "bg": 3997952,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "hello world                                                                                             ",
+          "fg": 16316658,
+          "bg": 3997952,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 31,
+      "text": " 1 +goodbye world                                                                                           ",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " 1 +",
+          "fg": 5294160,
+          "bg": 141312,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "goodbye world                                                                                           ",
+          "fg": 16316658,
+          "bg": 141312,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 32,
+      "text": " 2 +foo bar                                                                                                 ",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " 2 +",
+          "fg": 5294160,
+          "bg": 141312,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "foo bar                                                                                                 ",
+          "fg": 16316658,
+          "bg": 141312,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 33,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 34,
+      "text": "●Done.Thefilenowcontainsgoodbyeworldonthefirstlineandfoobaronthesecond.",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Done.Thefilenowcontains",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "goodbyeworld",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "onthefirstlineand",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "foobar",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "onthesecond.",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 35,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 36,
+      "text": "❯ y                                                                                                                     ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 239,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "y",
+          "fg": 231,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                                     ",
+          "fg": null,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 37,
+      "text": "   ",
+      "spans": [
+        {
+          "text": "   ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 38,
+      "text": "● The edit was already applied successfully. Anything else?                                                             ",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " The edit was already applied successfully. Anything else?                                                             ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 39,
+      "text": "                                             ",
+      "spans": [
+        {
+          "text": "                                             ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 40,
+      "text": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+      "spans": [
+        {
+          "text": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+          "fg": 244,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 41,
+      "text": "❯  ",
+      "spans": [
+        {
+          "text": "❯  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 42,
+      "text": "Resume this session with:───────────────────────────────────────────────────────────────────────────────────────────────",
+      "spans": [
+        {
+          "text": "Resume this session with:",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "───────────────────────────────────────────────────────────────────────────────────────────────",
+          "fg": 244,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 43,
+      "text": "claude --resume 694baf59-70b4-4162-b791-d2990b86efcf              ",
+      "spans": [
+        {
+          "text": "claude --resume 694baf59-70b4-4162-b791-d2990b86efcf",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "              ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    }
+  ]
+}

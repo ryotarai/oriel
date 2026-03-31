@@ -1,0 +1,1016 @@
+{
+  "name": "markdown_part2",
+  "description": "Screen state at ~40% of output",
+  "cols": 120,
+  "rows": 40,
+  "lines": [
+    {
+      "lineNumber": 0,
+      "text": "╭───ClaudeCodev2.1.87──────────────────────────────────────────────────────────────────────────────────────────────╮",
+      "spans": [
+        {
+          "text": "╭───ClaudeCode",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "v2.1.87",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "──────────────────────────────────────────────────────────────────────────────────────────────╮",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 1,
+      "text": "││Tipsforgettingstarted│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Tipsforgettingstarted",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 2,
+      "text": "│WelcomebackRyota!│Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "WelcomebackRyota!",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 3,
+      "text": "││───────────────────────────────────────────────────────────────│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "───────────────────────────────────────────────────────────────│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 4,
+      "text": "│▐▛███▜▌│Recentactivity│",
+      "spans": [
+        {
+          "text": "│▐",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛███▜",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▌",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Recentactivity",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 5,
+      "text": "│▝▜█████▛▘│Norecentactivity│",
+      "spans": [
+        {
+          "text": "│▝▜",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "█████",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛▘",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Norecentactivity",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 6,
+      "text": "│▘▘▝▝││",
+      "spans": [
+        {
+          "text": "│▘▘▝▝",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 7,
+      "text": "│Opus4.6(1Mcontext)·ClaudeMax·││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Opus4.6(1Mcontext)·ClaudeMax·",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 8,
+      "text": "│r-arai@mercari.com'sOrganization││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "r-arai@mercari.com'sOrganization",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 9,
+      "text": "│/…/src/github.com/ryotarai/claude-code-wrapper-ui││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "/…/src/github.com/ryotarai/claude-code-wrapper-ui",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 10,
+      "text": "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+      "spans": [
+        {
+          "text": "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 11,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 12,
+      "text": "❯ explain what a goroutine is. use headings, bullet points, and a code example in your response.                        ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 239,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "explain what a goroutine is. use headings, bullet points, and a code example in your response.",
+          "fg": 231,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                        ",
+          "fg": null,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 13,
+      "text": "   ",
+      "spans": [
+        {
+          "text": "   ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 14,
+      "text": "● Goroutines                                                                                                            ",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Goroutines",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": true,
+          "underline": true,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                            ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 15,
+      "text": "                                                               ",
+      "spans": [
+        {
+          "text": "                                                               ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 16,
+      "text": "  What They Are                                                                                                         ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "What They Are",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                         ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 17,
+      "text": "   ",
+      "spans": [
+        {
+          "text": "   ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 18,
+      "text": "  - A goroutine is a lightweight, concurrent function execution managed by the Go runtime — not by the OS.              ",
+      "spans": [
+        {
+          "text": "  - A ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "goroutine",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " is a lightweight, concurrent function execution managed by the Go runtime — not by the OS.              ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 19,
+      "text": "  - They are far cheaper than OS threads: a goroutine starts with ~2–8KBofstack(whichgrows/shrinks dynamically), so",
+      "spans": [
+        {
+          "text": "  - They are far cheaper than OS threads: a goroutine starts with ~2–8KBofstack(whichgrows/shrinks dynamically), so",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 20,
+      "text": "   you can run millions of them in a single process.                                                                    ",
+      "spans": [
+        {
+          "text": "   you can run millions of them in a single process.                                                                    ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 21,
+      "text": "  - The Go runtime multiplexes goroutines onto a small pool of OS threads(M:Nscheduling).                  ",
+      "spans": [
+        {
+          "text": "  - The Go runtime multiplexes goroutines onto a small pool of OS threads(M:Nscheduling).                  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 22,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 23,
+      "text": "  How to Use Them                                                                                                       ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "How to Use Them",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                       ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 24,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 25,
+      "text": "  - Prefix any function call with the go keyword to launch it as a goroutine.                                           ",
+      "spans": [
+        {
+          "text": "  - Prefix any function call with the ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "go",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " keyword to launch it as a goroutine.                                           ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 26,
+      "text": "  - The calling goroutine continues immediately — it does not waitforthelaunchedgoroutinetofinish.              ",
+      "spans": [
+        {
+          "text": "  - The calling goroutine continues immediately — it does ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "not",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " waitforthelaunchedgoroutinetofinish.              ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 27,
+      "text": "  - Use channels (chan) or sync.WaitGroup to coordinate between goroutines.                                             ",
+      "spans": [
+        {
+          "text": "  - Use channels (",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "chan",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": ") or ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "sync.WaitGroup",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " to coordinate between goroutines.                                             ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 28,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 29,
+      "text": "  Key Characteristics                           ────────────────────────────────────────────────────────────────────────",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Key Characteristics",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                           ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "────────────────────────────────────────────────────────────────────────",
+          "fg": 244,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 30,
+      "text": "❯                                                                                                                       ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                                      ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 31,
+      "text": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+      "spans": [
+        {
+          "text": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+          "fg": 244,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 32,
+      "text": "⏵⏵bypasspermissionson (shift+tabtocycle)·esctointerrupt◐medium·/effort",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "⏵⏵bypasspermissionson",
+          "fg": 211,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " (shift+tabtocycle)·esctointerrupt◐medium·/effort",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    }
+  ]
+}

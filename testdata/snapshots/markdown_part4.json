@@ -1,0 +1,1748 @@
+{
+  "name": "markdown_part4",
+  "description": "Screen state at ~80% of output",
+  "cols": 120,
+  "rows": 40,
+  "lines": [
+    {
+      "lineNumber": 0,
+      "text": "╭───ClaudeCodev2.1.87──────────────────────────────────────────────────────────────────────────────────────────────╮",
+      "spans": [
+        {
+          "text": "╭───ClaudeCode",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "v2.1.87",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "──────────────────────────────────────────────────────────────────────────────────────────────╮",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 1,
+      "text": "││Tipsforgettingstarted│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Tipsforgettingstarted",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 2,
+      "text": "│WelcomebackRyota!│Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "WelcomebackRyota!",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Run/inittocreateaCLAUDE.mdfilewithinstructionsforCla…",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 3,
+      "text": "││───────────────────────────────────────────────────────────────│",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "───────────────────────────────────────────────────────────────│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 4,
+      "text": "│▐▛███▜▌│Recentactivity│",
+      "spans": [
+        {
+          "text": "│▐",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛███▜",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▌",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Recentactivity",
+          "fg": 174,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 5,
+      "text": "│▝▜█████▛▘│Norecentactivity│",
+      "spans": [
+        {
+          "text": "│▝▜",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "█████",
+          "fg": 174,
+          "bg": 16,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "▛▘",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "Norecentactivity",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 6,
+      "text": "│▘▘▝▝││",
+      "spans": [
+        {
+          "text": "│▘▘▝▝",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 7,
+      "text": "│Opus4.6(1Mcontext)·ClaudeMax·││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Opus4.6(1Mcontext)·ClaudeMax·",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 8,
+      "text": "│r-arai@mercari.com'sOrganization││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "r-arai@mercari.com'sOrganization",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 9,
+      "text": "│/…/src/github.com/ryotarai/claude-code-wrapper-ui││",
+      "spans": [
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "/…/src/github.com/ryotarai/claude-code-wrapper-ui",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": true
+        },
+        {
+          "text": "│",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 10,
+      "text": "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+      "spans": [
+        {
+          "text": "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+          "fg": 174,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 11,
+      "text": "",
+      "spans": [
+        {
+          "text": "",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 12,
+      "text": "❯ explain what a goroutine is. use headings, bullet points, and a code example in your response.                        ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 239,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "explain what a goroutine is. use headings, bullet points, and a code example in your response.",
+          "fg": 231,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                        ",
+          "fg": null,
+          "bg": 237,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 13,
+      "text": "   ",
+      "spans": [
+        {
+          "text": "   ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 14,
+      "text": "● Goroutines                                                                                                            ",
+      "spans": [
+        {
+          "text": "●",
+          "fg": 231,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Goroutines",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": true,
+          "underline": true,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                            ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 15,
+      "text": "                                                               ",
+      "spans": [
+        {
+          "text": "                                                               ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 16,
+      "text": "  What They Are                                                                                                         ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "What They Are",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                         ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 17,
+      "text": "   ",
+      "spans": [
+        {
+          "text": "   ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 18,
+      "text": "  - A goroutine is a lightweight, concurrent function execution managed by the Go runtime — not by the OS.              ",
+      "spans": [
+        {
+          "text": "  - A ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "goroutine",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " is a lightweight, concurrent function execution managed by the Go runtime — not by the OS.              ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 19,
+      "text": "  - They are far cheaper than OS threads: a goroutine starts with ~2–8KBofstack(whichgrows/shrinks dynamically), so",
+      "spans": [
+        {
+          "text": "  - They are far cheaper than OS threads: a goroutine starts with ~2–8KBofstack(whichgrows/shrinks dynamically), so",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 20,
+      "text": "   you can run millions of them in a single process.                                                                    ",
+      "spans": [
+        {
+          "text": "   you can run millions of them in a single process.                                                                    ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 21,
+      "text": "  - The Go runtime multiplexes goroutines onto a small pool of OS threads(M:Nscheduling).                  ",
+      "spans": [
+        {
+          "text": "  - The Go runtime multiplexes goroutines onto a small pool of OS threads(M:Nscheduling).                  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 22,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 23,
+      "text": "  How to Use Them                                                                                                       ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "How to Use Them",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                       ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 24,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 25,
+      "text": "  - Prefix any function call with the go keyword to launch it as a goroutine.                                           ",
+      "spans": [
+        {
+          "text": "  - Prefix any function call with the ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "go",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " keyword to launch it as a goroutine.                                           ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 26,
+      "text": "  - The calling goroutine continues immediately — it does not waitforthelaunchedgoroutinetofinish.              ",
+      "spans": [
+        {
+          "text": "  - The calling goroutine continues immediately — it does ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "not",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " waitforthelaunchedgoroutinetofinish.              ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 27,
+      "text": "  - Use channels (chan) or sync.WaitGroup to coordinate between goroutines.                                             ",
+      "spans": [
+        {
+          "text": "  - Use channels (",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "chan",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": ") or ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "sync.WaitGroup",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " to coordinate between goroutines.                                             ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 28,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 29,
+      "text": "  Key Characteristics                                                                                                   ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Key Characteristics",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                   ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 30,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 31,
+      "text": "  - Cooperative scheduling — goroutines yield at certain points (channel ops, syscalls, runtime.Gosched()), and the     ",
+      "spans": [
+        {
+          "text": "  - ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Cooperative scheduling",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " — goroutines yield at certain points (channel ops, syscalls, ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "runtime.Gosched()",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "), and the     ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 32,
+      "text": "  runtime also preempts long-running goroutines.                                    ",
+      "spans": [
+        {
+          "text": "  runtime also preempts long-running goroutines.                                    ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 33,
+      "text": "  - Shared address space — goroutines in the same program share memory, so you still need synchronization (channels,    ",
+      "spans": [
+        {
+          "text": "  - ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Shared address space",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " — goroutines in the same program share memory, so you still need synchronization (channels,    ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 34,
+      "text": "  mutexes) to avoid data races.                                                                                         ",
+      "spans": [
+        {
+          "text": "  mutexes) to avoid data races.                                                                                         ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 35,
+      "text": "  -No return value—youcan'tdirectlyreceiveareturnvaluefromagocall;useachanneltosendresultsback.",
+      "spans": [
+        {
+          "text": "  -",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "No return value",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "—youcan'tdirectlyreceiveareturnvaluefroma",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "go",
+          "fg": 153,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "call;useachanneltosendresultsback.",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 36,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 37,
+      "text": "  Code Example                                                                                                          ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "Code Example",
+          "fg": null,
+          "bg": null,
+          "bold": true,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                          ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 38,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 39,
+      "text": "  package main                                                                                                          ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "package",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " main                                                                                                          ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 40,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 41,
+      "text": "  import(",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "import",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "(",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 42,
+      "text": "        \"fmt\"                                                                                                           ",
+      "spans": [
+        {
+          "text": "        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "\"fmt\"",
+          "fg": 1,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                           ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 43,
+      "text": "        \"sync\"                                                                                                          ",
+      "spans": [
+        {
+          "text": "        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "\"sync\"",
+          "fg": 1,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                          ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 44,
+      "text": "  )                                                                                                                     ",
+      "spans": [
+        {
+          "text": "  )                                                                                                                     ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 45,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 46,
+      "text": "  func printNumbers(label string, wg *sync.WaitGroup) {                                                                 ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "func",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " printNumbers(label ",
+          "fg": 3,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "string",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": ", wg *sync.WaitGroup)",
+          "fg": 3,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " {                                                                 ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 47,
+      "text": "        defer wg.Done()                                           ",
+      "spans": [
+        {
+          "text": "        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "defer",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " wg.Done()                                           ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 48,
+      "text": "        for i := 0; i < 5; i++ {                                                                                        ",
+      "spans": [
+        {
+          "text": "        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "for",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " i := ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "0",
+          "fg": 2,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "; i < ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "5",
+          "fg": 2,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "; i++ {                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 49,
+      "text": "                fmt.Printf(\"%s: %d\\n\", label, i)                                                                        ",
+      "spans": [
+        {
+          "text": "                fmt.Printf(",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "\"%s: %d\\n\"",
+          "fg": 1,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": ", label, i)                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 50,
+      "text": "        }                                                                                                               ",
+      "spans": [
+        {
+          "text": "        }                                                                                                               ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 51,
+      "text": "  }                                                                                                                     ",
+      "spans": [
+        {
+          "text": "  }                                                                                                                     ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 52,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 53,
+      "text": "  func main() {                                                                                                         ",
+      "spans": [
+        {
+          "text": "  ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "func",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " main()",
+          "fg": 3,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " {                                                                                                         ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 54,
+      "text": "        var wg sync.WaitGroup                                     ",
+      "spans": [
+        {
+          "text": "        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "var",
+          "fg": 4,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": " wg sync.WaitGroup                                     ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 55,
+      "text": "                                                                                                                        ",
+      "spans": [
+        {
+          "text": "                                                                                                                        ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 56,
+      "text": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+      "spans": [
+        {
+          "text": "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+          "fg": 244,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 57,
+      "text": "❯                                                                                                                       ",
+      "spans": [
+        {
+          "text": "❯ ",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "                                                                                                                      ",
+          "fg": null,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    },
+    {
+      "lineNumber": 58,
+      "text": "────────────────────────────────────────cycle)·esctointerrupt",
+      "spans": [
+        {
+          "text": "────────────────────────────────────────",
+          "fg": 244,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        },
+        {
+          "text": "cycle)·esctointerrupt",
+          "fg": 246,
+          "bg": null,
+          "bold": false,
+          "italic": false,
+          "underline": false,
+          "dim": false
+        }
+      ]
+    }
+  ]
+}
