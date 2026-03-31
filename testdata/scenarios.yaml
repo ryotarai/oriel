@@ -1,0 +1,20 @@
+- name: hello
+  steps:
+    - send_line: "say hello in a few words"
+      wait: "30s"
+
+- name: markdown
+  steps:
+    - send_line: "explain what a goroutine is. use headings, bullet points, and a code example in your response."
+      wait: "60s"
+
+- name: diff
+  steps:
+    - send_line: "create a file called /tmp/testfile_for_capture.txt with the content 'hello world' in it"
+      wait: "30s"
+    - send_line: "y"
+      wait: "30s"
+    - send_line: "now edit /tmp/testfile_for_capture.txt and change 'hello world' to 'goodbye world' and add a second line 'foo bar'"
+      wait: "30s"
+    - send_line: "y"
+      wait: "30s"
