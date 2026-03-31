@@ -28,6 +28,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
+	mux.HandleFunc("/api/diff", handler.HandleDiff)
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	log.Printf("Listening on %s", *listenAddr)

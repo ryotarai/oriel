@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/ryotarai/claude-code-wrapper-ui/internal/conversation"
+	"github.com/ryotarai/claude-code-wrapper-ui/internal/diff"
 	ptylib "github.com/ryotarai/claude-code-wrapper-ui/internal/pty"
 )
 
@@ -47,6 +49,10 @@ type session struct {
 
 	// Current terminal size (for restart)
 	cols, rows uint16
+
+	// Git state captured at session start
+	startCommit string
+	cwd         string
 
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
@@ -118,9 +124,14 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 		return err
 	}
 
+	// Capture cwd and git HEAD for diff tracking
+	cwd, _ := os.Getwd()
+
 	s.mu.Lock()
 	s.pty = ptySess
 	s.exited = false
+	s.cwd = cwd
+	s.startCommit = diff.CaptureHead(cwd)
 	s.mu.Unlock()
 
 	go h.readPtyLoop(s)
@@ -296,6 +307,39 @@ func (h *Handler) HandleListSessions(w http.ResponseWriter, r *http.Request) {
 	sessions := conversation.ListSessions(projectPath)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sessions)
+}
+
+// HandleDiff returns per-file diff data for a session.
+func (h *Handler) HandleDiff(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session")
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	s.mu.Lock()
+	startCommit := s.startCommit
+	cwd := s.cwd
+	s.mu.Unlock()
+
+	files, err := diff.ComputeDiff(cwd, startCommit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"files": files,
+	})
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
