@@ -21,6 +21,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.ServeHTTP)
+	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
 	mux.Handle("/", http.FileServer(http.Dir(*staticDir)))
 
 	log.Printf("Listening on %s", *listenAddr)

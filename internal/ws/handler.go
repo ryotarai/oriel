@@ -270,6 +270,34 @@ func (h *Handler) broadcast(s *session, msg message) {
 	}
 }
 
+// HandleListSessions returns the session list for the current project as JSON.
+func (h *Handler) HandleListSessions(w http.ResponseWriter, r *http.Request) {
+	// Find project path from any active session
+	h.mu.Lock()
+	var projectPath string
+	for _, s := range h.sessions {
+		s.mu.Lock()
+		if s.pty != nil {
+			projectPath = conversation.ProjectPathForPID(s.pty.Pid())
+		}
+		s.mu.Unlock()
+		if projectPath != "" {
+			break
+		}
+	}
+	h.mu.Unlock()
+
+	if projectPath == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+		return
+	}
+
+	sessions := conversation.ListSessions(projectPath)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sessions)
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -351,6 +379,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				s.rows = uint16(msg.Rows)
 				s.mu.Unlock()
 				pty.Resize(uint16(msg.Cols), uint16(msg.Rows))
+			}
+		case "resume":
+			// Resume a specific session by ID
+			sessionToResume := msg.Data
+			if sessionToResume != "" {
+				log.Printf("Session %s: resume requested for %s", s.id, sessionToResume)
+				select {
+				case s.restartCh <- restartRequest{resumeSessionID: sessionToResume}:
+				default:
+				}
 			}
 		}
 	}
