@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	ptylib "github.com/ryotarai/claude-code-wrapper-ui/internal/pty"
@@ -44,20 +45,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer session.Close()
 
+	var wsMu sync.Mutex
+	writeJSON := func(msg message) error {
+		wsMu.Lock()
+		defer wsMu.Unlock()
+		return conn.WriteJSON(msg)
+	}
+
 	// pty → WebSocket
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := session.Read(buf)
 			if err != nil {
-				conn.WriteJSON(message{Type: "exit"})
+				writeJSON(message{Type: "exit"})
 				return
 			}
 			msg := message{
 				Type: "output",
 				Data: base64.StdEncoding.EncodeToString(buf[:n]),
 			}
-			if err := conn.WriteJSON(msg); err != nil {
+			if err := writeJSON(msg); err != nil {
 				return
 			}
 		}
