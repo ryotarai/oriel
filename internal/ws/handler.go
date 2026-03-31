@@ -2,11 +2,14 @@ package ws
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/ryotarai/claude-code-wrapper-ui/internal/conversation"
 	ptylib "github.com/ryotarai/claude-code-wrapper-ui/internal/pty"
 )
 
@@ -15,10 +18,11 @@ var upgrader = websocket.Upgrader{
 }
 
 type message struct {
-	Type string `json:"type"`
-	Data string `json:"data,omitempty"`
-	Cols int    `json:"cols,omitempty"`
-	Rows int    `json:"rows,omitempty"`
+	Type string          `json:"type"`
+	Data string          `json:"data,omitempty"`
+	Cols int             `json:"cols,omitempty"`
+	Rows int             `json:"rows,omitempty"`
+	Entry json.RawMessage `json:"entry,omitempty"`
 }
 
 type Handler struct {
@@ -51,6 +55,31 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer wsMu.Unlock()
 		return conn.WriteJSON(msg)
 	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	// JSONL conversation watcher → WebSocket
+	cwd, _ := os.Getwd()
+	convCh := make(chan conversation.ConversationEntry, 64)
+	go conversation.WatchForSession(cwd, convCh, done)
+	go func() {
+		for {
+			select {
+			case entry, ok := <-convCh:
+				if !ok {
+					return
+				}
+				entryJSON, err := json.Marshal(entry)
+				if err != nil {
+					continue
+				}
+				writeJSON(message{Type: "conversation", Entry: entryJSON})
+			case <-done:
+				return
+			}
+		}
+	}()
 
 	// pty → WebSocket
 	go func() {

@@ -14,16 +14,15 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
 
   const sendText = useCallback(
     (text: string) => {
-      for (const ch of text) {
-        onKeyData(ch);
-      }
+      // Send entire string at once (works for multibyte/IME input)
+      onKeyData(text);
     },
     [onKeyData],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Don't intercept during IME composition
-    if (composingRef.current) return;
+    if (composingRef.current || e.nativeEvent.isComposing) return;
 
     // Ctrl+key shortcuts — send as control characters
     if (e.ctrlKey && e.key.length === 1) {
@@ -33,14 +32,23 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
       return;
     }
 
-    // Enter without Shift — send the text + carriage return
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Cmd+Enter (Mac) or Ctrl+Enter — send the text + carriage return
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       if (value.length > 0) {
         sendText(value);
       }
       onKeyData("\r");
       setValue("");
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      return;
+    }
+
+    // Plain Enter — let it add a newline (default behavior)
+    if (e.key === "Enter") {
       return;
     }
 
@@ -99,7 +107,7 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
             setValue(e.currentTarget.value);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Type here... (Enter to send, Shift+Enter for newline)"
+          placeholder="Type here... (Cmd+Enter to send)"
           rows={1}
           className="w-full bg-gray-800 text-gray-100 rounded-lg px-3 py-2 text-sm resize-none border border-gray-700 focus:border-blue-600 focus:outline-none placeholder-gray-500"
           autoFocus

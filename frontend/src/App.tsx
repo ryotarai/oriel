@@ -1,15 +1,13 @@
-// frontend/src/App.tsx
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useWebSocket } from "./hooks/useWebSocket";
+import { useWebSocket, type ConversationEntry } from "./hooks/useWebSocket";
 import { HiddenTerminal } from "./terminal/HiddenTerminal";
 import { extractLines } from "./terminal/BufferReader";
 import { detectBlocks } from "./terminal/PatternDetector";
 import type { Block } from "./types";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { WelcomeCard } from "./components/WelcomeCard";
-import { UserMessage } from "./components/UserMessage";
-import { AssistantMessage } from "./components/AssistantMessage";
-import { CodeBlock } from "./components/CodeBlock";
 import { ToolCallCard } from "./components/ToolCallCard";
 import { DiffView } from "./components/DiffView";
 import { SpinnerIndicator } from "./components/SpinnerIndicator";
@@ -19,13 +17,20 @@ import { InputArea } from "./components/InputArea";
 
 const WS_URL = `ws://${window.location.host}/ws`;
 
+/** Items displayed in the main content area */
+type DisplayItem =
+  | { kind: "pty-block"; block: Block; key: string }
+  | { kind: "conversation"; entry: ConversationEntry; key: string };
+
 export default function App() {
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [ptyBlocks, setPtyBlocks] = useState<Block[]>([]);
   const [bottomBlocks, setBottomBlocks] = useState<Block[]>([]);
+  const [convEntries, setConvEntries] = useState<ConversationEntry[]>([]);
   const [exited, setExited] = useState(false);
   const hiddenTermRef = useRef<HiddenTerminal | null>(null);
   const hiddenDivRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const seenUUIDs = useRef(new Set<string>());
 
   useEffect(() => {
     if (hiddenDivRef.current && !hiddenTermRef.current) {
@@ -44,9 +49,7 @@ export default function App() {
     if (!ht) return;
     const lines = extractLines(ht.terminal.buffer.active as any);
     const detected = detectBlocks(lines);
-    // Split blocks into main content and bottom area (input prompt + status bar)
     const bottomTypes = new Set(["input-prompt", "status-bar"]);
-    // Find the last separator before input-prompt as the split point
     let splitIdx = detected.length;
     for (let j = detected.length - 1; j >= 0; j--) {
       if (bottomTypes.has(detected[j].type)) {
@@ -57,8 +60,15 @@ export default function App() {
         break;
       }
     }
-    setBlocks(detected.slice(0, splitIdx));
+    setPtyBlocks(detected.slice(0, splitIdx));
     setBottomBlocks(detected.slice(splitIdx));
+  }, []);
+
+  const handleConversation = useCallback((entry: ConversationEntry) => {
+    if (seenUUIDs.current.has(entry.uuid)) return;
+    seenUUIDs.current.add(entry.uuid);
+    if (entry.isThinking) return; // skip thinking blocks
+    setConvEntries((prev) => [...prev, entry]);
   }, []);
 
   const { connected, sendInput } = useWebSocket({
@@ -68,11 +78,16 @@ export default function App() {
       requestAnimationFrame(updateBlocks);
     },
     onExit: () => setExited(true),
+    onConversation: handleConversation,
   });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [blocks]);
+  }, [ptyBlocks, convEntries]);
+
+  // Build display items: use conversation entries for user/assistant text,
+  // pty blocks for everything else (welcome, tool calls, diffs, spinners)
+  const displayItems = buildDisplayItems(ptyBlocks, convEntries);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
@@ -91,9 +106,12 @@ export default function App() {
       )}
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto pb-24">
-        {blocks.map((block, i) => (
-          <BlockRenderer key={`${block.type}-${i}`} block={block} />
-        ))}
+        {displayItems.map((item) => {
+          if (item.kind === "conversation") {
+            return <ConversationMessage key={item.key} entry={item.entry} />;
+          }
+          return <PtyBlockRenderer key={item.key} block={item.block} />;
+        })}
       </div>
 
       <InputArea onKeyData={sendInput} bottomBlocks={bottomBlocks} />
@@ -101,14 +119,84 @@ export default function App() {
   );
 }
 
-function BlockRenderer({ block }: { block: Block }) {
+function buildDisplayItems(ptyBlocks: Block[], convEntries: ConversationEntry[]): DisplayItem[] {
+  const items: DisplayItem[] = [];
+
+  if (convEntries.length > 0) {
+    // When we have conversation entries, only show welcome from pty
+    // and use conversation entries for all user/assistant content
+    for (const block of ptyBlocks) {
+      if (block.type === "welcome") {
+        items.push({ kind: "pty-block", block, key: `pty-welcome` });
+        break;
+      }
+    }
+
+    // Show conversation entries (with proper markdown)
+    for (const entry of convEntries) {
+      items.push({ kind: "conversation", entry, key: `conv-${entry.uuid}` });
+    }
+  } else {
+    // No conversation entries yet — fall back to pty-only rendering
+    for (let i = 0; i < ptyBlocks.length; i++) {
+      items.push({ kind: "pty-block", block: ptyBlocks[i], key: `pty-${i}` });
+    }
+  }
+
+  return items;
+}
+
+function ConversationMessage({ entry }: { entry: ConversationEntry }) {
+  if (entry.role === "user") {
+    return (
+      <div className="my-3 flex justify-end px-4">
+        <div className="max-w-2xl rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100">
+          {entry.text}
+        </div>
+      </div>
+    );
+  }
+
+  // Assistant message — render as markdown
+  return (
+    <div className="my-3 px-4 prose prose-invert prose-sm max-w-none
+      prose-headings:text-gray-100 prose-headings:mt-4 prose-headings:mb-2
+      prose-p:text-gray-200 prose-p:leading-relaxed
+      prose-li:text-gray-200
+      prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded
+      prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg
+      prose-a:text-blue-400
+      prose-strong:text-gray-100
+    ">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {entry.text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function PtyBlockRenderer({ block }: { block: Block }) {
   switch (block.type) {
     case "welcome": return <WelcomeCard block={block} />;
-    case "user-prompt": return <UserMessage block={block} />;
-    case "assistant-text": return <AssistantMessage block={block} />;
+    case "user-prompt": return (
+      <div className="my-3 flex justify-end px-4">
+        <div className="max-w-2xl rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100">
+          {block.lines[0]?.text.replace(/^❯\s*/, "").trim()}
+        </div>
+      </div>
+    );
+    case "assistant-text": return (
+      <div className="my-1 px-4 text-gray-200 leading-relaxed">
+        {block.content ?? block.lines.map(l => l.text.trim()).join(" ")}
+      </div>
+    );
     case "heading": return <Heading block={block} />;
     case "bullet-list": return <BulletList block={block} />;
-    case "code-block": return <CodeBlock block={block} />;
+    case "code-block": return (
+      <div className="my-3 mx-4 rounded-lg border border-gray-700 bg-gray-900 overflow-x-auto">
+        <div className="p-4"><TerminalFallback lines={block.lines} /></div>
+      </div>
+    );
     case "tool-call": return <ToolCallCard block={block} />;
     case "tool-result": return null;
     case "diff": return <DiffView block={block} />;

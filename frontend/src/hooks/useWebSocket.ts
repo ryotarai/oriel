@@ -1,12 +1,21 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
+export interface ConversationEntry {
+  type: string;
+  role: string;
+  uuid: string;
+  text: string;
+  isThinking?: boolean;
+}
+
 interface UseWebSocketOptions {
   url: string;
   onOutput: (data: Uint8Array) => void;
   onExit: () => void;
+  onConversation: (entry: ConversationEntry) => void;
 }
 
-export function useWebSocket({ url, onOutput, onExit }: UseWebSocketOptions) {
+export function useWebSocket({ url, onOutput, onExit, onConversation }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -23,6 +32,9 @@ export function useWebSocket({ url, onOutput, onExit }: UseWebSocketOptions) {
         onOutput(bytes);
       } else if (msg.type === "exit") {
         onExit();
+      } else if (msg.type === "conversation" && msg.entry) {
+        const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
+        onConversation(entry);
       }
     };
 
@@ -37,9 +49,12 @@ export function useWebSocket({ url, onOutput, onExit }: UseWebSocketOptions) {
 
   const sendInput = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Use TextEncoder for multibyte (UTF-8) support
+      const bytes = new TextEncoder().encode(data);
+      const base64 = btoa(String.fromCharCode(...bytes));
       wsRef.current.send(JSON.stringify({
         type: "input",
-        data: btoa(data),
+        data: base64,
       }));
     }
   }, []);
