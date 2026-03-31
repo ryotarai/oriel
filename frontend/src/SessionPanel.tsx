@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DiffPanel, type FileDiffData } from "./components/DiffPanel";
 
 interface ConversationEntry {
   type: string;
@@ -33,6 +34,8 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
+  const [activeTab, setActiveTab] = useState<"conversation" | "diff">("conversation");
+  const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
 
   // Resume modal
   const [showResumeModal, setShowResumeModal] = useState(false);
@@ -165,6 +168,21 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries]);
 
+  // Poll diff API
+  useEffect(() => {
+    const poll = () => {
+      fetch(`/api/diff?session=${encodeURIComponent(sessionId)}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.files) setDiffFiles(data.files);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [sessionId]);
+
   const onVDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     dragging.current = true;
@@ -191,29 +209,67 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       {/* Chat panel (top) */}
       <div
         style={{ height: `${splitPct}%` }}
-        className="flex flex-col min-h-0 cursor-text"
-        onClick={() => {
-          const sel = window.getSelection();
-          if (sel && sel.toString().length > 0) return;
-          termRef.current?.focus();
-        }}
+        className="flex flex-col min-h-0"
       >
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col">
-          <div className="flex flex-col space-y-3 mt-auto">
-            {!connected && (
-              <div className="text-center text-yellow-400 text-sm">Connecting...</div>
+        {/* Tab bar */}
+        <div className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50">
+          <button
+            onClick={() => setActiveTab("conversation")}
+            className={`px-4 py-2 text-xs font-medium transition-colors ${
+              activeTab === "conversation"
+                ? "text-gray-100 border-b-2 border-blue-500"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            Conversation
+          </button>
+          <button
+            onClick={() => setActiveTab("diff")}
+            className={`px-4 py-2 text-xs font-medium transition-colors ${
+              activeTab === "diff"
+                ? "text-gray-100 border-b-2 border-blue-500"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            Diff
+            {diffFiles.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-300 text-[10px]">
+                {diffFiles.length}
+              </span>
             )}
-            {entries.length === 0 && connected && (
-              <div className="text-gray-600 text-sm text-center mt-4">
-                Messages will appear here...
-              </div>
-            )}
-            {entries.map((entry) => (
-              <MessageBubble key={entry.uuid} entry={entry} />
-            ))}
-            <div ref={chatEndRef} />
-          </div>
+          </button>
         </div>
+
+        {/* Tab content */}
+        {activeTab === "conversation" ? (
+          <div
+            className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col min-h-0 cursor-text"
+            onClick={() => {
+              const sel = window.getSelection();
+              if (sel && sel.toString().length > 0) return;
+              termRef.current?.focus();
+            }}
+          >
+            <div className="flex flex-col space-y-3 mt-auto">
+              {!connected && (
+                <div className="text-center text-yellow-400 text-sm">Connecting...</div>
+              )}
+              {entries.length === 0 && connected && (
+                <div className="text-gray-600 text-sm text-center mt-4">
+                  Messages will appear here...
+                </div>
+              )}
+              {entries.map((entry) => (
+                <MessageBubble key={entry.uuid} entry={entry} />
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0">
+            <DiffPanel files={diffFiles} />
+          </div>
+        )}
       </div>
 
       {/* Vertical drag handle */}
