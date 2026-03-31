@@ -19,6 +19,7 @@ type Message struct {
 	SessionID string          `json:"sessionId"`
 	Timestamp string          `json:"timestamp"`
 	Message   json.RawMessage `json:"message"`
+	IsMeta    bool            `json:"isMeta,omitempty"`
 }
 
 // ContentBlock represents a content block within a message.
@@ -196,6 +197,9 @@ func parseLine(line []byte) (ConversationEntry, bool) {
 	}
 
 	if msg.Type != "user" && msg.Type != "assistant" {
+		return ConversationEntry{}, false
+	}
+	if msg.IsMeta {
 		return ConversationEntry{}, false
 	}
 
