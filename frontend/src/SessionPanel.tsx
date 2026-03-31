@@ -101,6 +101,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
         const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
         term.write(bytes);
       } else if (msg.type === "conversation_reset") {
+        term.reset();
         seenUUIDs.current.clear();
         setEntries([]);
       } else if (msg.type === "conversation" && msg.entry) {
