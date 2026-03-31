@@ -2,21 +2,29 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/ryotarai/claude-code-wrapper-ui/frontend"
+	"github.com/ryotarai/claude-code-wrapper-ui/internal/auth"
+	"github.com/ryotarai/claude-code-wrapper-ui/internal/fileexplorer"
 	"github.com/ryotarai/claude-code-wrapper-ui/internal/ws"
 )
 
 func main() {
-	listenAddr := flag.String("listen-addr", ":8080", "Listen address (e.g. :8080, 127.0.0.1:3000)")
+	listenAddr := flag.String("listen-addr", "localhost:9111", "Listen address (e.g. :8080, 127.0.0.1:3000)")
 	command := flag.String("command", "claude", "Command to run in pty")
+	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
 	flag.Parse()
+
+	token := auth.GenerateToken()
 
 	handler := ws.NewHandler(*command)
 
@@ -29,18 +37,39 @@ func main() {
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
 	mux.HandleFunc("/api/diff", handler.HandleDiff)
+	mux.HandleFunc("/api/files/tree", fileexplorer.HandleTree)
+	mux.HandleFunc("/api/files/read", fileexplorer.HandleFile)
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
+	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)
 	log.Printf("Listening on %s", *listenAddr)
+	log.Printf("Open %s", url)
 
 	go func() {
-		if err := http.ListenAndServe(*listenAddr, mux); err != nil {
+		if err := http.ListenAndServe(*listenAddr, auth.Middleware(token, mux)); err != nil {
 			log.Fatal(err)
 		}
 	}()
+
+	if !*noOpen {
+		openBrowser(url)
+	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
 	log.Println("Shutting down")
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	default:
+		return
+	}
+	cmd.Start()
 }
