@@ -24,8 +24,16 @@ type Message struct {
 
 // ContentBlock represents a content block within a message.
 type ContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type     string          `json:"type"`
+	Text     string          `json:"text,omitempty"`
+	Thinking string          `json:"thinking,omitempty"`
+	ID       string          `json:"id,omitempty"`
+	Name     string          `json:"name,omitempty"`
+	Input    json.RawMessage `json:"input,omitempty"`
+	// tool_result fields
+	ToolUseID string          `json:"tool_use_id,omitempty"`
+	Content   json.RawMessage `json:"content,omitempty"`
+	IsError   bool            `json:"is_error,omitempty"`
 }
 
 // ParsedMessage is the inner message with role and content.
@@ -41,6 +49,12 @@ type ConversationEntry struct {
 	UUID       string `json:"uuid"`
 	Text       string `json:"text"`
 	IsThinking bool   `json:"isThinking,omitempty"`
+	// Tool use fields
+	ToolName  string `json:"toolName,omitempty"`
+	ToolInput string `json:"toolInput,omitempty"`
+	ToolUseID string `json:"toolUseId,omitempty"`
+	// Tool result fields
+	IsError bool `json:"isError,omitempty"`
 }
 
 // sessionMeta matches ~/.claude/sessions/<pid>.json
@@ -145,9 +159,7 @@ func readAllEntries(jsonlPath string) []ConversationEntry {
 		if err != nil {
 			break
 		}
-		if entry, ok := parseLine(line); ok {
-			entries = append(entries, entry)
-		}
+		entries = append(entries, parseLine(line)...)
 	}
 	return entries
 }
@@ -180,7 +192,7 @@ func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, done
 			return
 		}
 
-		if entry, ok := parseLine(line); ok {
+		for _, entry := range parseLine(line) {
 			select {
 			case ch <- entry:
 			case <-done:
@@ -190,59 +202,138 @@ func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, done
 	}
 }
 
-func parseLine(line []byte) (ConversationEntry, bool) {
+func parseLine(line []byte) []ConversationEntry {
 	var msg Message
 	if err := json.Unmarshal(line, &msg); err != nil {
-		return ConversationEntry{}, false
+		return nil
 	}
 
 	if msg.Type != "user" && msg.Type != "assistant" {
-		return ConversationEntry{}, false
+		return nil
 	}
 	if msg.IsMeta {
-		return ConversationEntry{}, false
+		return nil
 	}
 
 	var parsed ParsedMessage
 	if err := json.Unmarshal(msg.Message, &parsed); err != nil {
-		return ConversationEntry{}, false
+		return nil
 	}
 
-	text, isThinking := extractText(parsed.Content)
-	if text == "" {
-		return ConversationEntry{}, false
-	}
-
-	return ConversationEntry{
-		Type:       msg.Type,
-		Role:       parsed.Role,
-		UUID:       msg.UUID,
-		Text:       text,
-		IsThinking: isThinking,
-	}, true
+	return extractEntries(parsed.Content, msg)
 }
 
-func extractText(content json.RawMessage) (string, bool) {
+func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
+	// Try string content (simple user messages)
 	var str string
 	if err := json.Unmarshal(content, &str); err == nil {
-		return str, false
+		if str == "" {
+			return nil
+		}
+		return []ConversationEntry{{
+			Type: msg.Type,
+			Role: msg.Type,
+			UUID: msg.UUID,
+			Text: str,
+		}}
 	}
 
+	// Parse as array of content blocks
 	var rawBlocks []json.RawMessage
 	if err := json.Unmarshal(content, &rawBlocks); err != nil {
-		return "", false
+		return nil
 	}
+
+	var entries []ConversationEntry
+	blockIdx := 0
 	for _, raw := range rawBlocks {
 		var block ContentBlock
 		if err := json.Unmarshal(raw, &block); err != nil {
 			continue
 		}
-		if block.Type == "text" && block.Text != "" {
-			return block.Text, false
-		}
-		if block.Type == "thinking" && block.Text != "" {
-			return block.Text, true
+
+		uuid := fmt.Sprintf("%s-%d", msg.UUID, blockIdx)
+		blockIdx++
+
+		switch block.Type {
+		case "text":
+			if block.Text == "" {
+				continue
+			}
+			entries = append(entries, ConversationEntry{
+				Type: msg.Type,
+				Role: msg.Type,
+				UUID: uuid,
+				Text: block.Text,
+			})
+		case "thinking":
+			text := block.Thinking
+			if text == "" {
+				text = block.Text
+			}
+			if text == "" {
+				continue
+			}
+			entries = append(entries, ConversationEntry{
+				Type:       msg.Type,
+				Role:       msg.Type,
+				UUID:       uuid,
+				Text:       text,
+				IsThinking: true,
+			})
+		case "tool_use":
+			inputStr := ""
+			if block.Input != nil {
+				inputStr = string(block.Input)
+			}
+			entries = append(entries, ConversationEntry{
+				Type:      "tool_use",
+				Role:      msg.Type,
+				UUID:      uuid,
+				ToolName:  block.Name,
+				ToolInput: inputStr,
+				ToolUseID: block.ID,
+			})
+		case "tool_result":
+			text := extractToolResultText(block.Content)
+			entries = append(entries, ConversationEntry{
+				Type:      "tool_result",
+				Role:      msg.Type,
+				UUID:      uuid,
+				Text:      text,
+				ToolUseID: block.ToolUseID,
+				IsError:   block.IsError,
+			})
 		}
 	}
-	return "", false
+	return entries
+}
+
+func extractToolResultText(content json.RawMessage) string {
+	if content == nil {
+		return ""
+	}
+
+	// Try string
+	var str string
+	if err := json.Unmarshal(content, &str); err == nil {
+		return str
+	}
+
+	// Try array of sub-blocks
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text,omitempty"`
+	}
+	if err := json.Unmarshal(content, &blocks); err == nil {
+		var parts []string
+		for _, b := range blocks {
+			if b.Type == "text" && b.Text != "" {
+				parts = append(parts, b.Text)
+			}
+		}
+		return strings.Join(parts, "\n")
+	}
+
+	return ""
 }

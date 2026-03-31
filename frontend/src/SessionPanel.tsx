@@ -15,6 +15,10 @@ interface ConversationEntry {
   uuid: string;
   text: string;
   isThinking?: boolean;
+  toolName?: string;
+  toolInput?: string;
+  toolUseId?: string;
+  isError?: boolean;
 }
 
 interface SessionSummary {
@@ -430,6 +434,14 @@ function BashBlock({ parts }: { parts: BashParts }) {
 }
 
 function MessageBubble({ entry }: { entry: ConversationEntry }) {
+  if (entry.type === "tool_use") {
+    return <ToolUseBlock entry={entry} />;
+  }
+
+  if (entry.type === "tool_result") {
+    return <ToolResultBlock entry={entry} />;
+  }
+
   if (entry.role === "user") {
     const bash = parseBashTags(entry.text);
     if (bash) {
@@ -444,7 +456,7 @@ function MessageBubble({ entry }: { entry: ConversationEntry }) {
     if (/^\[.*\]$/.test(entry.text.trim())) return null;
 
     return (
-      <div className="flex justify-end">
+      <div className="flex justify-start">
         <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-3 py-1.5 text-gray-100 text-sm whitespace-pre-wrap">
           {entry.text}
         </div>
@@ -475,6 +487,118 @@ function MessageBubble({ entry }: { entry: ConversationEntry }) {
       </ReactMarkdown>
     </div>
   );
+}
+
+function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const summary = toolUseSummary(entry.toolName ?? "", entry.toolInput ?? "");
+
+  return (
+    <div className="my-1">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left rounded-lg bg-gray-800/60 border border-gray-700/50 px-3 py-1.5 hover:bg-gray-800 transition-colors"
+      >
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-gray-500">{expanded ? "▼" : "▶"}</span>
+          <span className="text-green-400 font-medium">{entry.toolName}</span>
+          <span className="text-gray-400 truncate">{summary}</span>
+        </div>
+      </button>
+      {expanded && entry.toolInput && (
+        <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 px-3 py-2 text-xs font-mono text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">
+          {formatToolInput(entry.toolInput)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const text = entry.text || "";
+  const lines = text.split("\n");
+  const preview = lines.slice(0, 3).join("\n");
+  const hasMore = lines.length > 3;
+
+  if (!text) return null;
+
+  return (
+    <div className="my-1 ml-4">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left rounded-lg bg-gray-900/50 border border-gray-700/30 px-3 py-1.5 hover:bg-gray-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-gray-500">{expanded ? "▼" : "▶"}</span>
+          <span className={entry.isError ? "text-red-400" : "text-gray-500"}>
+            {entry.isError ? "Error" : "Result"}
+          </span>
+          <span className="text-gray-500 text-[10px]">
+            {lines.length} line{lines.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </button>
+      {expanded && (
+        <div className={`mt-1 rounded-lg bg-gray-900 border px-3 py-2 text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto ${
+          entry.isError ? "border-red-800/50 text-red-300" : "border-gray-700/50 text-gray-400"
+        }`}>
+          {text}
+        </div>
+      )}
+      {!expanded && hasMore && (
+        <div className="mt-1 px-3 text-xs font-mono text-gray-500 whitespace-pre-wrap truncate">
+          {preview}…
+        </div>
+      )}
+      {!expanded && !hasMore && (
+        <div className="mt-1 px-3 text-xs font-mono text-gray-500 whitespace-pre-wrap">
+          {preview}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function toolUseSummary(name: string, inputJson: string): string {
+  try {
+    const input = JSON.parse(inputJson);
+    switch (name) {
+      case "Bash":
+        return input.command ? `$ ${input.command}` : "";
+      case "Read":
+        return input.file_path ?? "";
+      case "Write":
+        return input.file_path ?? "";
+      case "Edit":
+        return input.file_path ?? "";
+      case "Glob":
+        return input.pattern ?? "";
+      case "Grep":
+        return input.pattern ?? "";
+      case "Agent":
+        return input.description ?? input.prompt?.slice(0, 60) ?? "";
+      case "Skill":
+        return input.skill ?? "";
+      case "TaskCreate":
+        return input.subject ?? "";
+      case "TaskUpdate":
+        return `#${input.taskId} → ${input.status ?? "update"}`;
+      default:
+        return "";
+    }
+  } catch {
+    return "";
+  }
+}
+
+function formatToolInput(inputJson: string): string {
+  try {
+    const parsed = JSON.parse(inputJson);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return inputJson;
+  }
 }
 
 function sendResize(ws: WebSocket, cols: number, rows: number) {

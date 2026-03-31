@@ -39,8 +39,9 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
           autoFocus
           className="w-full bg-gray-800/50 text-gray-100 text-sm rounded px-2 py-1
                      border border-gray-700/50 focus:border-gray-600 focus:outline-none
-                     resize-none placeholder-gray-600 caret-gray-400"
-          placeholder="IME input here — direct keys go to Claude Code"
+                     resize-none placeholder-gray-600 caret-gray-400 overflow-hidden"
+          style={{ maxHeight: "6rem" }}
+          placeholder="Type message — Cmd+Enter to send"
           onCompositionStart={() => {
             composingRef.current = true;
           }}
@@ -59,16 +60,32 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
           }}
           onInput={(e) => {
             // During IME composition, let text accumulate in textarea.
-            // Otherwise, clear immediately — regular keys are handled via onKeyDown.
-            if (!composingRef.current) {
-              // Use requestAnimationFrame to clear after the input event settles
-              const el = e.currentTarget;
-              requestAnimationFrame(() => { el.value = ""; });
+            if (composingRef.current) {
+              return;
             }
+            // Auto-resize textarea height
+            const el = e.currentTarget;
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
           }}
           onKeyDown={(e) => {
             // Skip IME-initiated keystrokes (keyCode 229 = IME processing)
             if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return;
+
+            // Cmd+Enter (or Ctrl+Enter) → send (submit the textarea content then \r)
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              const text = textareaRef.current?.value ?? "";
+              if (text) onKeyData(text);
+              onKeyData("\r");
+              if (textareaRef.current) textareaRef.current.value = "";
+              return;
+            }
+
+            // Plain Enter → insert newline in textarea (default behavior, don't prevent)
+            if (e.key === "Enter" && !e.shiftKey && !e.altKey) {
+              return;
+            }
 
             const data = keyEventToData(e);
             if (data !== null) {
@@ -85,7 +102,6 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
 }
 
 function keyEventToData(e: React.KeyboardEvent): string | null {
-  if (e.key === "Enter") return "\r";
   if (e.key === "Backspace") return "\x7f";
   if (e.key === "Delete") return "\x1b[3~";
   if (e.key === "Tab" && e.shiftKey) return "\x1b[Z";

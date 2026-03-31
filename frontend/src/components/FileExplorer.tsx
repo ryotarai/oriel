@@ -93,7 +93,7 @@ function TreeItem({
   selectedPath: string | null;
   onSelect: (path: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(depth < 1);
+  const [expanded, setExpanded] = useState(false);
 
   if (node.isDir) {
     return (
