@@ -4,7 +4,10 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
 import { DiffPanel, type FileDiffData } from "./components/DiffPanel";
+import { FileExplorer } from "./components/FileExplorer";
 
 interface ConversationEntry {
   type: string;
@@ -34,7 +37,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
-  const [activeTab, setActiveTab] = useState<"conversation" | "diff">("conversation");
+  const [activeTab, setActiveTab] = useState<"conversation" | "diff" | "files">("conversation");
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
 
   // Resume modal
@@ -168,6 +171,30 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries]);
 
+  // Quote-reply: press "r" with selected text to insert as quote into terminal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "r" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const sel = window.getSelection();
+      const text = sel?.toString();
+      if (!text) return;
+
+      const ws = wsRef.current;
+      const term = termRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN || !term) return;
+
+      e.preventDefault();
+      const quoted = text.split("\n").map((line) => `> ${line}`).join("\n") + "\n";
+      const bytes = new TextEncoder().encode(quoted);
+      const base64 = btoa(String.fromCharCode(...bytes));
+      ws.send(JSON.stringify({ type: "input", data: base64 }));
+      sel?.removeAllRanges();
+      term.focus();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Poll diff API
   useEffect(() => {
     const poll = () => {
@@ -238,6 +265,16 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab("files")}
+            className={`px-4 py-2 text-xs font-medium transition-colors ${
+              activeTab === "files"
+                ? "text-gray-100 border-b-2 border-blue-500"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            Files
+          </button>
         </div>
 
         {/* Tab content */}
@@ -265,9 +302,13 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
               <div ref={chatEndRef} />
             </div>
           </div>
-        ) : (
+        ) : activeTab === "diff" ? (
           <div className="flex-1 flex flex-col min-h-0">
             <DiffPanel files={diffFiles} />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0">
+            <FileExplorer />
           </div>
         )}
       </div>
@@ -421,7 +462,15 @@ function MessageBubble({ entry }: { entry: ConversationEntry }) {
       prose-a:text-blue-400
       prose-strong:text-gray-100
     ">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          a: ({ children, ...props }) => (
+            <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>
+          ),
+        }}
+      >
         {entry.text}
       </ReactMarkdown>
     </div>
