@@ -198,7 +198,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
           termRef.current?.focus();
         }}
       >
-        <div className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col justify-end">
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col">
           <div className="flex flex-col space-y-3 mt-auto">
             {!connected && (
               <div className="text-center text-yellow-400 text-sm">Connecting...</div>
