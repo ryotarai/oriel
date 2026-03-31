@@ -57,6 +57,11 @@ func (s *Session) Done() <-chan struct{} {
 	return s.doneCh
 }
 
+// Pid returns the PID of the child process.
+func (s *Session) Pid() int {
+	return s.cmd.Process.Pid
+}
+
 func (s *Session) Read(buf []byte) (int, error) {
 	return s.ptmx.Read(buf)
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -60,9 +59,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer close(done)
 
 	// JSONL conversation watcher → WebSocket
-	cwd, _ := os.Getwd()
+	// Use the child process PID to discover its session ID
 	convCh := make(chan conversation.ConversationEntry, 64)
-	go conversation.WatchForSession(cwd, convCh, done)
+	go conversation.WatchSession(session.Pid(), convCh, done)
 	go func() {
 		for {
 			select {

@@ -25,8 +25,6 @@ type Message struct {
 type ContentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
 }
 
 // ParsedMessage is the inner message with role and content.
@@ -37,51 +35,76 @@ type ParsedMessage struct {
 
 // ConversationEntry is what we send to the frontend.
 type ConversationEntry struct {
-	Type    string `json:"type"`    // "user" or "assistant"
-	Role    string `json:"role"`    // "user" or "assistant"
-	UUID    string `json:"uuid"`    // unique ID
-	Text    string `json:"text"`    // extracted plain text / markdown
-	IsThinking bool `json:"isThinking,omitempty"` // thinking block
+	Type       string `json:"type"`
+	Role       string `json:"role"`
+	UUID       string `json:"uuid"`
+	Text       string `json:"text"`
+	IsThinking bool   `json:"isThinking,omitempty"`
 }
 
-// ProjectDir returns the Claude Code projects directory for a given cwd.
-func ProjectDir(cwd string) string {
+// sessionMeta matches ~/.claude/sessions/<pid>.json
+type sessionMeta struct {
+	PID       int    `json:"pid"`
+	SessionID string `json:"sessionId"`
+	CWD       string `json:"cwd"`
+}
+
+// projectDir returns the Claude Code projects directory for a given cwd.
+func projectDir(cwd string) string {
 	home, _ := os.UserHomeDir()
 	escaped := strings.NewReplacer("/", "-", ".", "-").Replace(cwd)
 	return filepath.Join(home, ".claude", "projects", escaped)
 }
 
-// FindJSONL finds JSONL files in the project directory and returns the most recent.
-func FindJSONL(projectDir string) (string, error) {
-	entries, err := os.ReadDir(projectDir)
-	if err != nil {
-		return "", fmt.Errorf("read project dir: %w", err)
-	}
+// sessionsDir returns the Claude Code sessions directory.
+func sessionsDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".claude", "sessions")
+}
 
-	var newest string
-	var newestTime time.Time
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
-			continue
+// discoverSessionID polls ~/.claude/sessions/ for a file matching the given PID
+// and returns the sessionID and cwd.
+func discoverSessionID(pid int, done <-chan struct{}) (sessionID, cwd string, err error) {
+	target := fmt.Sprintf("%d.json", pid)
+	path := filepath.Join(sessionsDir(), target)
+
+	for {
+		select {
+		case <-done:
+			return "", "", fmt.Errorf("cancelled")
+		default:
 		}
-		info, err := e.Info()
+
+		data, err := os.ReadFile(path)
 		if err != nil {
+			// Claude Code hasn't written the session file yet; wait
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
-		if info.ModTime().After(newestTime) {
-			newestTime = info.ModTime()
-			newest = filepath.Join(projectDir, e.Name())
+
+		var meta sessionMeta
+		if err := json.Unmarshal(data, &meta); err != nil {
+			return "", "", fmt.Errorf("parse session meta: %w", err)
 		}
+
+		return meta.SessionID, meta.CWD, nil
 	}
-	if newest == "" {
-		return "", fmt.Errorf("no JSONL files found in %s", projectDir)
-	}
-	return newest, nil
 }
 
 // WatchJSONL watches a JSONL file and sends new conversation entries to the channel.
-// It starts by reading existing entries, then tails for new ones.
 func WatchJSONL(jsonlPath string, ch chan<- ConversationEntry, done <-chan struct{}) error {
+	// Wait for file to appear
+	for {
+		if _, err := os.Stat(jsonlPath); err == nil {
+			break
+		}
+		select {
+		case <-done:
+			return nil
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+
 	f, err := os.Open(jsonlPath)
 	if err != nil {
 		return fmt.Errorf("open jsonl: %w", err)
@@ -100,7 +123,6 @@ func WatchJSONL(jsonlPath string, ch chan<- ConversationEntry, done <-chan struc
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err == io.EOF {
-				// Wait for more data
 				time.Sleep(200 * time.Millisecond)
 				continue
 			}
@@ -124,7 +146,6 @@ func parseLine(line []byte) (ConversationEntry, bool) {
 		return ConversationEntry{}, false
 	}
 
-	// Only process user and assistant messages
 	if msg.Type != "user" && msg.Type != "assistant" {
 		return ConversationEntry{}, false
 	}
@@ -149,35 +170,20 @@ func parseLine(line []byte) (ConversationEntry, bool) {
 }
 
 func extractText(content json.RawMessage) (string, bool) {
-	// Content can be a string or array of content blocks
 	var str string
 	if err := json.Unmarshal(content, &str); err == nil {
 		return str, false
 	}
 
-	var blocks []ContentBlock
-	if err := json.Unmarshal(content, &blocks); err != nil {
-		// Try as array of mixed types (tool_result etc.)
-		var rawBlocks []json.RawMessage
-		if err := json.Unmarshal(content, &rawBlocks); err != nil {
-			return "", false
-		}
-		for _, raw := range rawBlocks {
-			var block ContentBlock
-			if err := json.Unmarshal(raw, &block); err != nil {
-				continue
-			}
-			if block.Type == "text" && block.Text != "" {
-				return block.Text, false
-			}
-			if block.Type == "thinking" && block.Text != "" {
-				return block.Text, true
-			}
-		}
+	var rawBlocks []json.RawMessage
+	if err := json.Unmarshal(content, &rawBlocks); err != nil {
 		return "", false
 	}
-
-	for _, block := range blocks {
+	for _, raw := range rawBlocks {
+		var block ContentBlock
+		if err := json.Unmarshal(raw, &block); err != nil {
+			continue
+		}
 		if block.Type == "text" && block.Text != "" {
 			return block.Text, false
 		}
@@ -188,29 +194,24 @@ func extractText(content json.RawMessage) (string, bool) {
 	return "", false
 }
 
-// WatchForSession watches the project directory for a JSONL file matching the session.
-// It polls until a file appears, then starts watching it.
-func WatchForSession(cwd string, ch chan<- ConversationEntry, done <-chan struct{}) {
-	projectDir := ProjectDir(cwd)
+// WatchSession discovers the session ID from the child PID, then watches
+// the corresponding JSONL file for conversation entries.
+func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}) {
+	log.Printf("Discovering session for PID %d...", childPID)
 
-	for {
-		select {
-		case <-done:
-			return
-		default:
-		}
-
-		jsonlPath, err := FindJSONL(projectDir)
-		if err != nil {
-			log.Printf("Waiting for JSONL file in %s: %v", projectDir, err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		log.Printf("Watching JSONL: %s", jsonlPath)
-		if err := WatchJSONL(jsonlPath, ch, done); err != nil {
-			log.Printf("JSONL watch error: %v", err)
-		}
+	sessionID, cwd, err := discoverSessionID(childPID, done)
+	if err != nil {
+		log.Printf("Failed to discover session: %v", err)
 		return
+	}
+
+	log.Printf("Session discovered: %s (cwd: %s)", sessionID, cwd)
+
+	projDir := projectDir(cwd)
+	jsonlPath := filepath.Join(projDir, sessionID+".jsonl")
+
+	log.Printf("Watching JSONL: %s", jsonlPath)
+	if err := WatchJSONL(jsonlPath, ch, done); err != nil {
+		log.Printf("JSONL watch error: %v", err)
 	}
 }
