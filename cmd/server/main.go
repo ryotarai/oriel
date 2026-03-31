@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +12,7 @@ import (
 )
 
 func main() {
-	port := flag.Int("port", 8080, "HTTP port")
+	listenAddr := flag.String("listen-addr", ":8080", "Listen address (e.g. :8080, 127.0.0.1:3000)")
 	command := flag.String("command", "claude", "Command to run in pty")
 	staticDir := flag.String("static", "frontend/dist", "Static files directory")
 	flag.Parse()
@@ -24,11 +23,10 @@ func main() {
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.Handle("/", http.FileServer(http.Dir(*staticDir)))
 
-	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("Listening on %s", addr)
+	log.Printf("Listening on %s", *listenAddr)
 
 	go func() {
-		if err := http.ListenAndServe(addr, mux); err != nil {
+		if err := http.ListenAndServe(*listenAddr, mux); err != nil {
 			log.Fatal(err)
 		}
 	}()
