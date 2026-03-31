@@ -22,8 +22,8 @@ type Session struct {
 	doneCh   chan struct{}
 }
 
-func NewSession(command string, cols, rows uint16) (*Session, error) {
-	cmd := exec.Command(command)
+func NewSession(command string, cols, rows uint16, args ...string) (*Session, error) {
+	cmd := exec.Command(command, args...)
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("COLUMNS=%d", cols),
 		fmt.Sprintf("LINES=%d", rows),

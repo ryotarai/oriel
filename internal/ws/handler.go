@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -16,6 +18,15 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+var (
+	// "claude --resume <uuid>" — output when session ends (/exit) or on /resume
+	resumePattern = regexp.MustCompile(`claude --resume ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
+	// "(no content)" — output by /clear
+	clearPattern = regexp.MustCompile(`\(no content\)`)
+	// Strip ANSI escape sequences for pattern matching
+	ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[>\[?][0-9;]*[a-zA-Z]`)
+)
+
 type message struct {
 	Type  string          `json:"type"`
 	Data  string          `json:"data,omitempty"`
@@ -26,12 +37,23 @@ type message struct {
 
 // session is a single persistent pty session.
 type session struct {
-	id      string
-	pty     *ptylib.Session
-	mu      sync.Mutex
-	subs    map[*subscriber]struct{}
+	id  string
+	pty *ptylib.Session
+
+	mu          sync.Mutex
+	subs        map[*subscriber]struct{}
 	convHistory []conversation.ConversationEntry
-	exited  bool
+	exited      bool
+
+	// Current terminal size (for restart)
+	cols, rows uint16
+
+	// Signal channel: closed when the session needs to restart
+	restartCh chan restartRequest
+}
+
+type restartRequest struct {
+	resumeSessionID string // empty = fresh start, non-empty = --resume <id>
 }
 
 type subscriber struct {
@@ -69,28 +91,82 @@ func (h *Handler) getOrCreateSession(id string) (*session, error) {
 		return s, nil
 	}
 
-	ptySess, err := ptylib.NewSession(h.command, 120, 40)
-	if err != nil {
-		return nil, err
-	}
-
 	s := &session{
-		id:   id,
-		pty:  ptySess,
-		subs: make(map[*subscriber]struct{}),
+		id:        id,
+		subs:      make(map[*subscriber]struct{}),
+		cols:      120,
+		rows:      40,
+		restartCh: make(chan restartRequest, 1),
 	}
 	h.sessions[id] = s
 
-	// pty output → broadcast
-	go h.readPtyLoop(s)
-	// JSONL watcher
-	go h.watchConversation(s)
+	if err := h.startProcess(s); err != nil {
+		delete(h.sessions, id)
+		return nil, err
+	}
+
+	// Restart loop: when readPtyLoop detects /clear or /resume, it sends a
+	// restartRequest. This goroutine handles the restart.
+	go h.restartLoop(s)
 
 	return s, nil
 }
 
+func (h *Handler) startProcess(s *session, args ...string) error {
+	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, args...)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.pty = ptySess
+	s.exited = false
+	s.mu.Unlock()
+
+	go h.readPtyLoop(s)
+	go h.watchConversation(s)
+
+	return nil
+}
+
+func (h *Handler) restartLoop(s *session) {
+	for req := range s.restartCh {
+		log.Printf("Session %s: restarting (resume=%s)", s.id, req.resumeSessionID)
+
+		// Close old process
+		s.mu.Lock()
+		oldPty := s.pty
+		s.mu.Unlock()
+		if oldPty != nil {
+			oldPty.Close()
+		}
+
+		// Clear conversation history and notify frontend
+		s.mu.Lock()
+		s.convHistory = nil
+		s.mu.Unlock()
+		h.broadcast(s, message{Type: "conversation_reset"})
+
+		// Start new process
+		var args []string
+		if req.resumeSessionID != "" {
+			args = []string{"--resume", req.resumeSessionID}
+		}
+		if err := h.startProcess(s, args...); err != nil {
+			log.Printf("Session %s: restart failed: %v", s.id, err)
+			h.broadcast(s, message{Type: "error", Data: err.Error()})
+			continue
+		}
+
+		log.Printf("Session %s: restarted successfully", s.id)
+	}
+}
+
 func (h *Handler) readPtyLoop(s *session) {
 	buf := make([]byte, 4096)
+	// Buffer for detecting patterns across read boundaries
+	var detectBuf strings.Builder
+
 	for {
 		n, err := s.pty.Read(buf)
 		if err != nil {
@@ -100,18 +176,59 @@ func (h *Handler) readPtyLoop(s *session) {
 			s.mu.Unlock()
 			return
 		}
-		msg := message{
+
+		data := buf[:n]
+		h.broadcast(s, message{
 			Type: "output",
-			Data: base64.StdEncoding.EncodeToString(buf[:n]),
+			Data: base64.StdEncoding.EncodeToString(data),
+		})
+
+		// Check for session change patterns in pty output
+		// "Resume this session with:\nclaude --resume <uuid>"
+		// Strip ANSI escape sequences before pattern matching
+		detectBuf.Write(data)
+		text := ansiPattern.ReplaceAllString(detectBuf.String(), "")
+
+		// Detect /clear: "(no content)" in output
+		if clearPattern.MatchString(text) {
+			log.Printf("Session %s: detected /clear", s.id)
+			detectBuf.Reset()
+			select {
+			case s.restartCh <- restartRequest{}:
+			default:
+			}
+			return
 		}
-		h.broadcast(s, msg)
+
+		// Detect session end: "claude --resume <uuid>"
+		if m := resumePattern.FindStringSubmatch(text); m != nil {
+			oldSessionID := m[1]
+			log.Printf("Session %s: detected session end (old session: %s)", s.id, oldSessionID)
+			detectBuf.Reset()
+			select {
+			case s.restartCh <- restartRequest{}:
+			default:
+			}
+			return
+		}
+
+		// Keep buffer bounded — only need last ~200 bytes for pattern matching
+		if detectBuf.Len() > 500 {
+			recent := text[len(text)-200:]
+			detectBuf.Reset()
+			detectBuf.WriteString(recent)
+		}
 	}
 }
 
 func (h *Handler) watchConversation(s *session) {
-	convCh := make(chan conversation.ConversationEntry, 64)
+	s.mu.Lock()
+	pid := s.pty.Pid()
 	done := s.pty.Done()
-	go conversation.WatchSession(s.pty.Pid(), convCh, done)
+	s.mu.Unlock()
+
+	convCh := make(chan conversation.ConversationEntry, 64)
+	go conversation.WatchSession(pid, convCh, done)
 
 	for {
 		select {
@@ -119,7 +236,6 @@ func (h *Handler) watchConversation(s *session) {
 			if !ok {
 				return
 			}
-			// Reset sentinel: clear history and notify frontend
 			if entry.Type == "reset" {
 				s.mu.Lock()
 				s.convHistory = nil
@@ -162,7 +278,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Session ID from query parameter, default to "default"
 	sessionID := r.URL.Query().Get("session")
 	if sessionID == "" {
 		sessionID = "default"
@@ -215,6 +330,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		s.mu.Lock()
+		pty := s.pty
+		s.mu.Unlock()
+
 		switch msg.Type {
 		case "input":
 			data, err := base64.StdEncoding.DecodeString(msg.Data)
@@ -222,12 +341,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Decode input: %v", err)
 				continue
 			}
-			if err := s.pty.Write(data); err != nil {
+			if err := pty.Write(data); err != nil {
 				return
 			}
 		case "resize":
 			if msg.Cols > 0 && msg.Rows > 0 {
-				s.pty.Resize(uint16(msg.Cols), uint16(msg.Rows))
+				s.mu.Lock()
+				s.cols = uint16(msg.Cols)
+				s.rows = uint16(msg.Rows)
+				s.mu.Unlock()
+				pty.Resize(uint16(msg.Cols), uint16(msg.Rows))
 			}
 		}
 	}
