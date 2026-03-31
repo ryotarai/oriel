@@ -192,7 +192,11 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       <div
         style={{ height: `${splitPct}%` }}
         className="flex flex-col min-h-0 cursor-text"
-        onClick={() => termRef.current?.focus()}
+        onClick={() => {
+          const sel = window.getSelection();
+          if (sel && sel.toString().length > 0) return;
+          termRef.current?.focus();
+        }}
       >
         <div className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col justify-end">
           <div className="flex flex-col space-y-3 mt-auto">
