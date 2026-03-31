@@ -194,19 +194,21 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
         className="flex flex-col min-h-0 cursor-text"
         onClick={() => termRef.current?.focus()}
       >
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {!connected && (
-            <div className="text-center text-yellow-400 text-sm">Connecting...</div>
-          )}
-          {entries.length === 0 && connected && (
-            <div className="text-gray-600 text-sm text-center mt-4">
-              Messages will appear here...
-            </div>
-          )}
-          {entries.map((entry) => (
-            <MessageBubble key={entry.uuid} entry={entry} />
-          ))}
-          <div ref={chatEndRef} />
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col justify-end">
+          <div className="flex flex-col space-y-3 mt-auto">
+            {!connected && (
+              <div className="text-center text-yellow-400 text-sm">Connecting...</div>
+            )}
+            {entries.length === 0 && connected && (
+              <div className="text-gray-600 text-sm text-center mt-4">
+                Messages will appear here...
+              </div>
+            )}
+            {entries.map((entry) => (
+              <MessageBubble key={entry.uuid} entry={entry} />
+            ))}
+            <div ref={chatEndRef} />
+          </div>
         </div>
       </div>
 
