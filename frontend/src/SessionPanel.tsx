@@ -128,6 +128,30 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
 
     ws.onclose = () => setConnected(false);
 
+    // Plain Enter → Ctrl+J (newline) only when Claude's input prompt (❯) is active
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown") return true;
+      if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+        // Scan visible buffer for Claude's ❯ prompt
+        const buf = term.buffer.active;
+        let hasPrompt = false;
+        for (let i = 0; i < buf.length; i++) {
+          const text = buf.getLine(i)?.translateToString().trim() ?? "";
+          if (text.startsWith("❯")) { hasPrompt = true; break; }
+        }
+        if (!hasPrompt) return true; // Not in Claude input — normal Enter
+        // Send Ctrl+J (\n) instead of \r
+        e.preventDefault();
+        const bytes = new TextEncoder().encode("\n");
+        const base64 = btoa(String.fromCharCode(...bytes));
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "input", data: base64 }));
+        }
+        return false;
+      }
+      return true;
+    });
+
     // Intercept /resume command from terminal input
     term.onData((data) => {
       // Track input buffer to detect "/resume\r"
