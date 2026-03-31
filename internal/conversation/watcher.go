@@ -73,6 +73,34 @@ func readSessionMeta(pid int) (*sessionMeta, error) {
 	return &meta, nil
 }
 
+// findNewestJSONL returns the most recently modified JSONL file in a directory.
+func findNewestJSONL(dir string) (string, time.Time, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	var newest string
+	var newestTime time.Time
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(newestTime) {
+			newestTime = info.ModTime()
+			newest = filepath.Join(dir, e.Name())
+		}
+	}
+	if newest == "" {
+		return "", time.Time{}, fmt.Errorf("no JSONL files found")
+	}
+	return newest, newestTime, nil
+}
+
 // ReadAllEntries reads all conversation entries from a JSONL file.
 func ReadAllEntries(jsonlPath string) []ConversationEntry {
 	f, err := os.Open(jsonlPath)
@@ -97,22 +125,7 @@ func ReadAllEntries(jsonlPath string) []ConversationEntry {
 }
 
 // TailJSONL watches a JSONL file starting from a byte offset and sends new entries.
-// It returns when the done channel is closed or stopCh receives.
 func TailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, done <-chan struct{}, stopCh <-chan struct{}) {
-	// Wait for file to appear
-	for {
-		if _, err := os.Stat(jsonlPath); err == nil {
-			break
-		}
-		select {
-		case <-done:
-			return
-		case <-stopCh:
-			return
-		case <-time.After(500 * time.Millisecond):
-		}
-	}
-
 	f, err := os.Open(jsonlPath)
 	if err != nil {
 		log.Printf("TailJSONL open error: %v", err)
@@ -210,15 +223,32 @@ func extractText(content json.RawMessage) (string, bool) {
 	return "", false
 }
 
-// WatchSession continuously monitors the session metadata for the child PID.
-// When the sessionId changes (/clear, /resume), it sends a reset sentinel,
-// then replays the new JSONL's existing entries and tails for new ones.
-//
-// The reset sentinel has Type="reset" to tell the frontend to clear conversation state.
+// WatchSession discovers the project directory from the child PID's session metadata,
+// then continuously watches for the newest JSONL file in that directory.
+// When a newer JSONL appears (/clear, /resume), it sends a reset, replays the new
+// file's entries, and starts tailing it.
 func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}) {
 	log.Printf("Discovering session for PID %d...", childPID)
 
-	var currentSessionID string
+	// First, discover the project directory from session metadata
+	var projDir string
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+		meta, err := readSessionMeta(childPID)
+		if err != nil {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		projDir = projectDir(meta.CWD)
+		log.Printf("Project dir: %s", projDir)
+		break
+	}
+
+	var currentJSONL string
 	var stopTail chan struct{}
 
 	for {
@@ -228,27 +258,24 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		default:
 		}
 
-		meta, err := readSessionMeta(childPID)
+		newest, _, err := findNewestJSONL(projDir)
 		if err != nil {
-			time.Sleep(500 * time.Millisecond)
-			continue
-		}
-
-		if meta.SessionID == currentSessionID {
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		// Session changed — stop old tailer
+		if newest == currentJSONL {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		// JSONL file changed — stop old tailer
 		if stopTail != nil {
 			close(stopTail)
 		}
 
-		currentSessionID = meta.SessionID
-		projDir := projectDir(meta.CWD)
-		jsonlPath := filepath.Join(projDir, currentSessionID+".jsonl")
-
-		log.Printf("Session switched to %s, watching %s", currentSessionID, jsonlPath)
+		currentJSONL = newest
+		log.Printf("Watching JSONL: %s", currentJSONL)
 
 		// Send reset to frontend
 		select {
@@ -258,7 +285,7 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		}
 
 		// Read and replay existing entries
-		existing := ReadAllEntries(jsonlPath)
+		existing := ReadAllEntries(currentJSONL)
 		for _, entry := range existing {
 			select {
 			case ch <- entry:
@@ -269,13 +296,13 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 
 		// Get file size for tail offset
 		var offset int64
-		if info, err := os.Stat(jsonlPath); err == nil {
+		if info, err := os.Stat(currentJSONL); err == nil {
 			offset = info.Size()
 		}
 
 		// Start tailing new entries
 		stopTail = make(chan struct{})
-		go TailJSONL(jsonlPath, offset, ch, done, stopTail)
+		go TailJSONL(currentJSONL, offset, ch, done, stopTail)
 
 		time.Sleep(1 * time.Second)
 	}
