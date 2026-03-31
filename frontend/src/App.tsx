@@ -21,6 +21,7 @@ const WS_URL = `ws://${window.location.host}/ws`;
 
 export default function App() {
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [bottomBlocks, setBottomBlocks] = useState<Block[]>([]);
   const [exited, setExited] = useState(false);
   const hiddenTermRef = useRef<HiddenTerminal | null>(null);
   const hiddenDivRef = useRef<HTMLDivElement | null>(null);
@@ -43,7 +44,21 @@ export default function App() {
     if (!ht) return;
     const lines = extractLines(ht.terminal.buffer.active as any);
     const detected = detectBlocks(lines);
-    setBlocks(detected);
+    // Split blocks into main content and bottom area (input prompt + status bar)
+    const bottomTypes = new Set(["input-prompt", "status-bar"]);
+    // Find the last separator before input-prompt as the split point
+    let splitIdx = detected.length;
+    for (let j = detected.length - 1; j >= 0; j--) {
+      if (bottomTypes.has(detected[j].type)) {
+        splitIdx = j;
+      } else if (detected[j].type === "separator" && j + 1 < detected.length && bottomTypes.has(detected[j + 1].type)) {
+        splitIdx = j;
+      } else {
+        break;
+      }
+    }
+    setBlocks(detected.slice(0, splitIdx));
+    setBottomBlocks(detected.slice(splitIdx));
   }, []);
 
   const { connected, sendInput } = useWebSocket({
@@ -81,7 +96,7 @@ export default function App() {
         ))}
       </div>
 
-      <InputArea onKeyData={sendInput} />
+      <InputArea onKeyData={sendInput} bottomBlocks={bottomBlocks} />
     </div>
   );
 }
@@ -100,7 +115,7 @@ function BlockRenderer({ block }: { block: Block }) {
     case "spinner": return <SpinnerIndicator block={block} />;
     case "separator": return <div className="my-2 border-t border-gray-800" />;
     case "status-bar": return <StatusBar block={block} />;
-    case "input-prompt": return null;
+    case "input-prompt": return <TerminalFallback lines={block.lines} />;
     default: return <TerminalFallback lines={block.lines} />;
   }
 }

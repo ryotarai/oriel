@@ -1,21 +1,36 @@
+import type { Block } from "../types";
+import { TerminalFallback } from "./TerminalFallback";
+
 interface InputAreaProps {
   onKeyData: (data: string) => void;
+  /** The input-prompt, separator, and status-bar blocks from the bottom of the screen */
+  bottomBlocks: Block[];
 }
 
-export function InputArea({ onKeyData }: InputAreaProps) {
+export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-3"
+      className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 p-2 focus:outline-none"
       tabIndex={0}
       onKeyDown={(e) => {
         e.preventDefault();
         const data = keyEventToData(e);
         if (data) onKeyData(data);
       }}
+      // Auto-focus on mount
+      ref={(el) => el?.focus()}
     >
-      <div className="text-gray-400 text-sm text-center">
-        Type here — keystrokes are forwarded to Claude Code
-      </div>
+      {bottomBlocks.length > 0 ? (
+        <div className="font-mono text-sm">
+          {bottomBlocks.map((block, i) => (
+            <TerminalFallback key={i} lines={block.lines} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-sm text-center py-1">
+          Type here — keystrokes are forwarded to Claude Code
+        </div>
+      )}
     </div>
   );
 }
