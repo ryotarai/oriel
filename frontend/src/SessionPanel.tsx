@@ -295,8 +295,57 @@ function formatRelativeTime(tsMillis: number): string {
   return `${days}d ago`;
 }
 
+interface BashParts {
+  input?: string;
+  stdout?: string;
+  stderr?: string;
+}
+
+function parseBashTags(text: string): BashParts | null {
+  const inputMatch = text.match(/<bash-input>([\s\S]*?)<\/bash-input>/);
+  const stdoutMatch = text.match(/<bash-stdout>([\s\S]*?)<\/bash-stdout>/);
+  const stderrMatch = text.match(/<bash-stderr>([\s\S]*?)<\/bash-stderr>/);
+  if (!inputMatch && !stdoutMatch && !stderrMatch) return null;
+  return {
+    input: inputMatch?.[1],
+    stdout: stdoutMatch?.[1],
+    stderr: stderrMatch?.[1],
+  };
+}
+
+function BashBlock({ parts }: { parts: BashParts }) {
+  return (
+    <div className="rounded-lg bg-gray-900 border border-gray-700 overflow-hidden text-xs font-mono">
+      {parts.input != null && (
+        <div className="px-3 py-1.5 bg-gray-800/60 border-b border-gray-700 text-gray-200 flex items-center gap-1.5">
+          <span className="text-green-400">$</span>
+          <span>{parts.input}</span>
+        </div>
+      )}
+      {parts.stdout && (
+        <div className="px-3 py-1.5 text-gray-300 whitespace-pre-wrap">{parts.stdout}</div>
+      )}
+      {parts.stderr && (
+        <div className="px-3 py-1.5 text-red-400 whitespace-pre-wrap">{parts.stderr}</div>
+      )}
+    </div>
+  );
+}
+
 function MessageBubble({ entry }: { entry: ConversationEntry }) {
   if (entry.role === "user") {
+    const bash = parseBashTags(entry.text);
+    if (bash) {
+      return (
+        <div className="my-1">
+          <BashBlock parts={bash} />
+        </div>
+      );
+    }
+
+    // Skip meta markers like [Request interrupted by user]
+    if (/^\[.*\]$/.test(entry.text.trim())) return null;
+
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-3 py-1.5 text-gray-100 text-sm whitespace-pre-wrap">
