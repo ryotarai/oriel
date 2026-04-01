@@ -90,6 +90,7 @@ function keyEventToData(e: React.KeyboardEvent): string | null {
   if (e.key === "Enter") return "\r";
   if (e.key === "Backspace") return "\x7f";
   if (e.key === "Delete") return "\x1b[3~";
+  if (e.key === "Tab" && e.shiftKey) return "\x1b[Z";
   if (e.key === "Tab") return "\t";
   if (e.key === "Escape") return "\x1b";
   if (e.key === "ArrowUp") return "\x1b[A";
