@@ -386,7 +386,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       >
         {/* Tab bar */}
         <div
-          className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50 pr-24 cursor-grab active:cursor-grabbing"
+          className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50 pl-8 pr-24 cursor-grab active:cursor-grabbing"
           {...dragHandleProps}
         >
           <button
