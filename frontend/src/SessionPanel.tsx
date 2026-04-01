@@ -41,9 +41,10 @@ export interface SessionPanelHandle {
 interface SessionPanelProps {
   sessionId: string;
   dragHandleProps?: Record<string, unknown>;
+  swapEnterKeys?: boolean;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps }, ref) {
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -55,6 +56,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const swapEnterRef = useRef(swapEnterKeys ?? true);
+  useEffect(() => { swapEnterRef.current = swapEnterKeys ?? true; }, [swapEnterKeys]);
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
@@ -167,6 +171,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       // Don't intercept IME composition events (e.g. Japanese input confirm)
       if (e.isComposing || e.keyCode === 229) return true;
       if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+        if (!swapEnterRef.current) return true; // Swap disabled — normal Enter
         // Scan visible buffer for Claude's ❯ prompt
         const buf = term.buffer.active;
         let hasPrompt = false;

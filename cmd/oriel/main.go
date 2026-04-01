@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ryotarai/oriel/frontend"
 	"github.com/ryotarai/oriel/internal/auth"
+	"github.com/ryotarai/oriel/internal/config"
 	"github.com/ryotarai/oriel/internal/fileexplorer"
 	"github.com/ryotarai/oriel/internal/ws"
 )
@@ -33,12 +35,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	config.Load()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
 	mux.HandleFunc("/api/diff", handler.HandleDiff)
 	mux.HandleFunc("/api/files/tree", fileexplorer.HandleTree)
 	mux.HandleFunc("/api/files/read", fileexplorer.HandleFile)
+	mux.HandleFunc("/api/config", handleConfig)
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)
@@ -84,6 +89,28 @@ func main() {
 			log.Printf("Received %v again, shutting down", s)
 			return
 		}
+	}
+}
+
+func handleConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(config.Get())
+	case http.MethodPut:
+		var c config.Config
+		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := config.Set(c); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(c)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 

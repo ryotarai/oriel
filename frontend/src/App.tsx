@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { SettingsPage } from "./components/SettingsPage";
 import {
   DndContext,
   PointerSensor,
@@ -26,6 +27,12 @@ export default function App() {
   ]);
   // Split positions between panes (percentage of total width for each divider)
   const [splits, setSplits] = useState<number[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean }>({ swapEnterKeys: true });
+
+  useEffect(() => {
+    fetch("/api/config").then((r) => r.json()).then(setAppConfig).catch(() => {});
+  }, [showSettings]); // Re-fetch when settings modal closes
 
   const addPaneAt = useCallback((afterIndex: number) => {
     const newId = `pane-${Date.now()}`;
@@ -79,7 +86,26 @@ export default function App() {
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <SortableContext items={panes.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
-        <div className="h-screen w-screen bg-[#0a0a0f] flex overflow-hidden">
+        <div className="h-screen w-screen bg-[#0a0a0f] flex overflow-hidden relative">
+          {/* Settings button */}
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="absolute top-1 left-1 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
+            title="Settings"
+          >
+            ⚙
+          </button>
+          {showSettings && (
+            <div className="absolute inset-0 z-30 bg-black/70 flex items-start justify-center pt-16">
+              <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+                  <h2 className="text-gray-100 font-medium">Settings</h2>
+                  <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
+                </div>
+                <SettingsPage />
+              </div>
+            </div>
+          )}
           {panes.map((pane, i) => (
             <PaneWithDivider
               key={pane.id}
@@ -96,6 +122,7 @@ export default function App() {
                   return next;
                 });
               }}
+              swapEnterKeys={appConfig.swapEnterKeys}
             />
           ))}
         </div>
@@ -122,9 +149,10 @@ interface PaneWithDividerProps {
   onClose: () => void;
   onAdd: () => void;
   onDividerDrag: (posPct: number) => void;
+  swapEnterKeys: boolean;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
   const {
     attributes,
@@ -193,6 +221,7 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           ref={sessionRef}
           sessionId={pane.sessionId}
           dragHandleProps={{ ...attributes, ...listeners }}
+          swapEnterKeys={swapEnterKeys}
         />
       </div>
       {!isLast && (
