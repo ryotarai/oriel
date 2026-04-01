@@ -83,6 +83,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [worktreeDir, setWorktreeDir] = useState("");
+
+  const effectiveDir = worktreeDir || cwd || "";
 
   const sendInputToTerminal = useCallback((text: string) => {
     const ws = wsRef.current;
@@ -197,6 +200,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         term.reset();
         seenUUIDs.current.clear();
         setEntries([]);
+        setWorktreeDir("");
+      } else if (msg.type === "worktree_changed" && msg.data) {
+        setWorktreeDir(msg.data);
       } else if (msg.type === "conversation" && msg.entry) {
         const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
         handleConversation(entry);
@@ -514,11 +520,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           </div>
         ) : activeTab === "commits" ? (
           <div className="flex-1 flex flex-col min-h-0">
-            <CommitsPanel />
+            <CommitsPanel cwd={effectiveDir || undefined} />
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={cwd} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
           </div>
         )}
       </div>

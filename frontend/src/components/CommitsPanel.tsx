@@ -14,27 +14,29 @@ interface CommitDetail {
   diff: string;
 }
 
-export function CommitsPanel() {
+export function CommitsPanel({ cwd }: { cwd?: string }) {
   const [commits, setCommits] = useState<CommitSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<CommitDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/commits")
+    const cwdParam = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
+    fetch(`/api/commits${cwdParam}`)
       .then((r) => r.json())
       .then((data) => setCommits(data ?? []))
       .catch(() => {});
-  }, []);
+  }, [cwd]);
 
   const selectCommit = useCallback((hash: string) => {
     setSelected(hash);
     setLoading(true);
-    fetch(`/api/commits/show?hash=${encodeURIComponent(hash)}`)
+    const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
+    fetch(`/api/commits/show?hash=${encodeURIComponent(hash)}${cwdParam}`)
       .then((r) => r.json())
       .then((data) => { setDetail(data); setLoading(false); })
       .catch(() => { setDetail(null); setLoading(false); });
-  }, []);
+  }, [cwd]);
 
   return (
     <div className="flex flex-1 min-h-0">

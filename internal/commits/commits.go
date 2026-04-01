@@ -22,7 +22,11 @@ type CommitDetail struct {
 }
 
 func HandleList(w http.ResponseWriter, r *http.Request) {
-	out, err := exec.Command("git", "log", "--pretty=format:%H\t%s\t%an\t%ci", "-100").Output()
+	cmd := exec.Command("git", "log", "--pretty=format:%H\t%s\t%an\t%ci", "-100")
+	if cwd := r.URL.Query().Get("cwd"); cwd != "" {
+		cmd.Dir = cwd
+	}
+	out, err := cmd.Output()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -64,13 +68,23 @@ func HandleShow(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msgOut, err := exec.Command("git", "log", "-1", "--pretty=format:%s\n---BODY---\n%b", hash).Output()
+	cwd := r.URL.Query().Get("cwd")
+
+	msgCmd := exec.Command("git", "log", "-1", "--pretty=format:%s\n---BODY---\n%b", hash)
+	if cwd != "" {
+		msgCmd.Dir = cwd
+	}
+	msgOut, err := msgCmd.Output()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	diffOut, err := exec.Command("git", "diff-tree", "-p", "--no-commit-id", hash).Output()
+	diffCmd := exec.Command("git", "diff-tree", "-p", "--no-commit-id", hash)
+	if cwd != "" {
+		diffCmd.Dir = cwd
+	}
+	diffOut, err := diffCmd.Output()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

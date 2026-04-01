@@ -27,7 +27,11 @@ var (
 	clearPattern = regexp.MustCompile(`\(no content\)`)
 	// Strip ANSI escape sequences for pattern matching
 	ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[>\[?][0-9;]*[a-zA-Z]`)
+	// Detect working directory change (e.g. git worktree)
+	worktreePattern = regexp.MustCompile(`<new_working_directory>(.*?)</new_working_directory>`)
 )
+
+const appendSystemPrompt = `When you enter a git worktree or change your effective working directory (e.g., via EnterWorktree), output this tag so the UI can track it: <new_working_directory>/absolute/path</new_working_directory>`
 
 type message struct {
 	Type  string          `json:"type"`
@@ -52,6 +56,9 @@ type session struct {
 
 	// Working directory for diff/file operations
 	cwd string
+
+	// Worktree directory (set when Claude enters a git worktree); used for diff/files/commits
+	worktreeDir string
 
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
@@ -125,9 +132,13 @@ func (h *Handler) getOrCreateSession(id string, cwd string) (*session, error) {
 func (h *Handler) startProcess(s *session, args ...string) error {
 	s.mu.Lock()
 	cwd := s.cwd
+	s.worktreeDir = "" // reset on process start
 	s.mu.Unlock()
 
-	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, args...)
+	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
+	allArgs = append(allArgs, args...)
+
+	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, allArgs...)
 	if err != nil {
 		return err
 	}
@@ -244,6 +255,16 @@ func (h *Handler) readPtyLoop(s *session) {
 			return
 		}
 
+		// Detect working directory change (git worktree)
+		if m := worktreePattern.FindStringSubmatch(text); m != nil {
+			newDir := strings.TrimSpace(m[1])
+			log.Printf("Session %s: worktree changed to %s", s.id, newDir)
+			s.mu.Lock()
+			s.worktreeDir = newDir
+			s.mu.Unlock()
+			h.broadcast(s, message{Type: "worktree_changed", Data: newDir})
+		}
+
 		// Keep buffer bounded — only need last ~200 bytes for pattern matching
 		if detectBuf.Len() > 500 {
 			recent := text[len(text)-200:]
@@ -347,10 +368,13 @@ func (h *Handler) HandleDiff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	cwd := s.cwd
+	dir := s.worktreeDir
+	if dir == "" {
+		dir = s.cwd
+	}
 	s.mu.Unlock()
 
-	files, err := diff.ComputeDiff(cwd)
+	files, err := diff.ComputeDiff(dir)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
