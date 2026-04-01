@@ -57,8 +57,34 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-	log.Println("Shutting down")
+	for {
+		s := <-sig
+		if s == syscall.SIGTERM {
+			log.Println("Received SIGTERM, shutting down")
+			break
+		}
+		// SIGINT: prompt for confirmation
+		fmt.Print("\nThis will terminate running claude processes. Shut down? (y/N): ")
+		answerCh := make(chan string, 1)
+		go func() {
+			var answer string
+			fmt.Scanln(&answer)
+			answerCh <- answer
+		}()
+		select {
+		case answer := <-answerCh:
+			if answer == "y" || answer == "Y" {
+				log.Println("Shutting down")
+				return
+			}
+			fmt.Println("Cancelled. Press Ctrl-C again to be prompted.")
+		case s := <-sig:
+			// Second signal while waiting for input — force quit
+			fmt.Println()
+			log.Printf("Received %v again, shutting down", s)
+			return
+		}
+	}
 }
 
 func openBrowser(url string) {

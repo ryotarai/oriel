@@ -3,3 +3,5 @@ dist/
 /capture
 /server
 .playwright-mcp/
+/bin/
+/tmp/
