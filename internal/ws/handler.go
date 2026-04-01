@@ -119,6 +119,14 @@ func (h *Handler) watchConversation(s *session) {
 			if !ok {
 				return
 			}
+			// Reset sentinel: clear history and notify frontend
+			if entry.Type == "reset" {
+				s.mu.Lock()
+				s.convHistory = nil
+				s.mu.Unlock()
+				h.broadcast(s, message{Type: "conversation_reset"})
+				continue
+			}
 			entryJSON, err := json.Marshal(entry)
 			if err != nil {
 				continue

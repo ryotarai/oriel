@@ -66,6 +66,9 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       if (msg.type === "output") {
         const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
         term.write(bytes);
+      } else if (msg.type === "conversation_reset") {
+        seenUUIDs.current.clear();
+        setEntries([]);
       } else if (msg.type === "conversation" && msg.entry) {
         const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
         handleConversation(entry);
