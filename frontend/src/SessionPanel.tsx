@@ -47,9 +47,10 @@ interface SessionPanelProps {
   swapEnterKeys?: boolean;
   cwd?: string;
   onCwdChange?: (newCwd: string) => void;
+  resume?: boolean;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, cwd, onCwdChange }, ref) {
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, cwd, onCwdChange, resume }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -189,7 +190,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     fitRef.current = fit;
 
     const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
-    const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}${cwdParam}`;
+    const resumeParam = resume ? `&resume=${encodeURIComponent(sessionId)}` : "";
+    const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}${cwdParam}${resumeParam}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

@@ -52,6 +52,7 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean }>({ swapEnterKeys: true });
   const paneRefs = useRef<Map<string, SessionPanelHandle>>(new Map());
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [restoredSessionIds] = useState<Set<string>>(new Set());
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
 
@@ -81,6 +82,7 @@ export default function App() {
             });
           setTabs(loadedTabs);
           setActiveTabId(loadedTabs[0].id);
+          loadedTabs.forEach((t) => t.panes.forEach((p) => restoredSessionIds.add(p.sessionId)));
         }
         setInitialLoadDone(true);
       })
@@ -271,6 +273,7 @@ export default function App() {
                 }}
                 swapEnterKeys={appConfig.swapEnterKeys}
                 onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
+                resume={restoredSessionIds.has(pane.sessionId)}
                 onRef={(handle) => {
                   if (handle) paneRefs.current.set(pane.id, handle);
                   else paneRefs.current.delete(pane.id);
@@ -317,9 +320,10 @@ interface PaneWithDividerProps {
   onCwdChange: (newCwd: string) => void;
   onRef: (handle: SessionPanelHandle | null) => void;
   onFocus: () => void;
+  resume?: boolean;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange, onRef, onFocus }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange, onRef, onFocus, resume }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
   const paneContainerRef = useRef<HTMLDivElement>(null);
   const {
@@ -416,6 +420,7 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           swapEnterKeys={swapEnterKeys}
           cwd={pane.cwd}
           onCwdChange={onCwdChange}
+          resume={resume}
         />
       </div>
       {!isLast && (

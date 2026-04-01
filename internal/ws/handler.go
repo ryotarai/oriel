@@ -98,7 +98,7 @@ func NewHandler(command string, store *state.Store) *Handler {
 	}
 }
 
-func (h *Handler) getOrCreateSession(id string, cwd string) (*session, error) {
+func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*session, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -120,7 +120,18 @@ func (h *Handler) getOrCreateSession(id string, cwd string) (*session, error) {
 	}
 	h.sessions[id] = s
 
-	if err := h.startProcess(s); err != nil {
+	// If resuming a previous Claude session, pass --resume flag
+	var args []string
+	if resumeID != "" {
+		args = []string{"--resume", resumeID}
+		// Pre-load conversation history from the old session
+		oldEntries := conversation.ReadSessionEntries(cwd, resumeID)
+		if len(oldEntries) > 0 {
+			s.convHistory = append(s.convHistory, oldEntries...)
+		}
+	}
+
+	if err := h.startProcess(s, args...); err != nil {
 		delete(h.sessions, id)
 		return nil, err
 	}
@@ -491,7 +502,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cwd := r.URL.Query().Get("cwd")
-	s, err := h.getOrCreateSession(sessionID, cwd)
+	resumeID := r.URL.Query().Get("resume")
+	s, err := h.getOrCreateSession(sessionID, cwd, resumeID)
 	if err != nil {
 		log.Printf("Start session %s: %v", sessionID, err)
 		conn.WriteJSON(message{Type: "error", Data: err.Error()})
