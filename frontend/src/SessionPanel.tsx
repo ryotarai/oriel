@@ -292,7 +292,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
         className="flex flex-col min-h-0"
       >
         {/* Tab bar */}
-        <div className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50">
+        <div className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50 pr-24">
           <button
             onClick={() => setActiveTab("conversation")}
             className={`px-4 py-2 text-xs font-medium transition-colors ${
