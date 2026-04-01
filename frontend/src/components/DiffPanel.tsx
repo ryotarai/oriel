@@ -8,6 +8,7 @@ export interface FileDiffData {
 
 interface DiffPanelProps {
   files: FileDiffData[];
+  onSendInput?: (text: string) => void;
 }
 
 function statusColor(status: string): string {
@@ -28,7 +29,7 @@ function statusBgColor(status: string): string {
   }
 }
 
-export function DiffPanel({ files }: DiffPanelProps) {
+export function DiffPanel({ files, onSendInput }: DiffPanelProps) {
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +90,7 @@ export function DiffPanel({ files }: DiffPanelProps) {
             </div>
             {/* Diff content */}
             {f.diff ? (
-              <DiffBlock diff={f.diff} />
+              <DiffBlock diff={f.diff} filePath={f.path} onSendInput={onSendInput} />
             ) : (
               <div className="px-4 py-3 text-gray-500 text-xs italic">Binary file</div>
             )}
@@ -100,13 +101,13 @@ export function DiffPanel({ files }: DiffPanelProps) {
   );
 }
 
-function DiffBlock({ diff }: { diff: string }) {
+function DiffBlock({ diff, filePath, onSendInput }: { diff: string; filePath: string; onSendInput?: (text: string) => void }) {
   const lines = diff.split("\n");
 
   return (
     <pre className="text-xs font-mono leading-5 px-0 py-1">
       {lines.map((line, i) => {
-        let className = "px-4 ";
+        let className = "";
         if (line.startsWith("+++ ") || line.startsWith("--- ")) {
           className += "text-gray-500";
         } else if (line.startsWith("@@")) {
@@ -124,8 +125,25 @@ function DiffBlock({ diff }: { diff: string }) {
         }
 
         return (
-          <div key={i} className={className}>
-            {line || "\u00a0"}
+          <div key={i} className={`group flex ${className}`}>
+            <div className="w-8 flex-shrink-0 flex items-center justify-center">
+              {onSendInput && (
+                <button
+                  onClick={() => {
+                    onSendInput(`@${filePath}\n\`\`\`\n${line}\n\`\`\`\n`);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 transition-opacity p-0.5"
+                  title="Send line to Claude"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 14L2 14L2 2L10 2" />
+                    <path d="M5 8L14 8" />
+                    <path d="M11 5L14 8L11 11" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <span className="flex-1 pr-4">{line || "\u00a0"}</span>
           </div>
         );
       })}

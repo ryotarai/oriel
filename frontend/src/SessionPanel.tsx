@@ -50,6 +50,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
 
+  const sendInputToTerminal = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      const bytes = new TextEncoder().encode(text);
+      const base64 = btoa(String.fromCharCode(...bytes));
+      ws.send(JSON.stringify({ type: "input", data: base64 }));
+    }
+    termRef.current?.focus();
+  }, []);
+
   const openFileInExplorer = useCallback((path: string) => {
     setFileToOpen(path);
     setActiveTab("files");
@@ -347,11 +357,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
           </div>
         ) : activeTab === "diff" ? (
           <div className="flex-1 flex flex-col min-h-0">
-            <DiffPanel files={diffFiles} />
+            <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} />
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-            <FileExplorer requestedPath={fileToOpen} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} />
           </div>
         )}
       </div>

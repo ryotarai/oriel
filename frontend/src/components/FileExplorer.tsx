@@ -8,7 +8,7 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-export function FileExplorer({ requestedPath }: { requestedPath?: string | null }) {
+export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: string | null; onSendInput?: (text: string) => void }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export function FileExplorer({ requestedPath }: { requestedPath?: string | null 
                     Binary file
                   </div>
                 ) : (
-                  <HighlightedCode content={fileContent ?? ""} path={selectedPath} />
+                  <HighlightedCode content={fileContent ?? ""} path={selectedPath} onSendInput={onSendInput} />
                 )}
               </div>
             </div>
@@ -204,7 +204,7 @@ function extensionToLanguage(path: string): string | undefined {
   return undefined;
 }
 
-function HighlightedCode({ content, path }: { content: string; path: string }) {
+function HighlightedCode({ content, path, onSendInput }: { content: string; path: string; onSendInput?: (text: string) => void }) {
   const lang = extensionToLanguage(path);
   let html: string;
 
@@ -218,10 +218,90 @@ function HighlightedCode({ content, path }: { content: string; path: string }) {
     html = escapeHtml(content);
   }
 
+  // Split highlighted HTML into lines, preserving open span tags across line breaks
+  const htmlLines = splitHtmlByLines(html);
+  const rawLines = content.split("\n");
+
   return (
-    <pre className="text-xs font-mono p-3 leading-relaxed text-gray-200">
-      <code dangerouslySetInnerHTML={{ __html: html }} />
+    <pre className="text-xs font-mono py-3 leading-relaxed text-gray-200">
+      {htmlLines.map((lineHtml, i) => (
+        <LineWithButton
+          key={i}
+          lineHtml={lineHtml}
+          rawText={rawLines[i] ?? ""}
+          filePath={path}
+          onSendInput={onSendInput}
+        />
+      ))}
     </pre>
+  );
+}
+
+function splitHtmlByLines(html: string): string[] {
+  // Split HTML on newlines while carrying open <span> tags across lines
+  const lines: string[] = [];
+  let current = "";
+  let openTags: string[] = []; // stack of open <span ...> strings
+
+  let i = 0;
+  while (i < html.length) {
+    if (html[i] === "\n") {
+      lines.push(current);
+      current = openTags.join("");
+      i++;
+    } else if (html[i] === "<") {
+      const closeMatch = html.slice(i).match(/^<\/span>/);
+      if (closeMatch) {
+        current += closeMatch[0];
+        openTags.pop();
+        i += closeMatch[0].length;
+      } else {
+        const openMatch = html.slice(i).match(/^<span[^>]*>/);
+        if (openMatch) {
+          current += openMatch[0];
+          openTags.push(openMatch[0]);
+          i += openMatch[0].length;
+        } else {
+          current += html[i];
+          i++;
+        }
+      }
+    } else {
+      current += html[i];
+      i++;
+    }
+  }
+  lines.push(current);
+  return lines;
+}
+
+function LineWithButton({ lineHtml, rawText, filePath, onSendInput }: {
+  lineHtml: string;
+  rawText: string;
+  filePath: string;
+  onSendInput?: (text: string) => void;
+}) {
+  return (
+    <div className="group flex hover:bg-gray-800/40">
+      <div className="w-8 flex-shrink-0 flex items-center justify-center">
+        {onSendInput && (
+          <button
+            onClick={() => {
+              onSendInput(`@${filePath}\n\`\`\`\n${rawText}\n\`\`\`\n`);
+            }}
+            className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 transition-opacity p-0.5"
+            title="Send line to Claude"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 14L2 14L2 2L10 2" />
+              <path d="M5 8L14 8" />
+              <path d="M11 5L14 8L11 11" />
+            </svg>
+          </button>
+        )}
+      </div>
+      <code className="flex-1 px-1" dangerouslySetInnerHTML={{ __html: lineHtml || "\u00a0" }} />
+    </div>
   );
 }
 
