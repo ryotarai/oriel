@@ -22,8 +22,6 @@ var upgrader = websocket.Upgrader{
 }
 
 var (
-	// "claude --resume <uuid>" — output when session ends (/exit) or on /resume
-	resumePattern = regexp.MustCompile(`claude --resume ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
 	// "(no content)" — output by /clear
 	clearPattern = regexp.MustCompile(`\(no content\)`)
 	// Strip ANSI escape sequences for pattern matching
