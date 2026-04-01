@@ -102,6 +102,18 @@ func ReadSessionEntries(cwd, sessionID string) []ConversationEntry {
 	return readAllEntries(jsonlPath)
 }
 
+// SessionHasContent checks whether a session's JSONL conversation file exists
+// and contains at least one entry. Used to validate --resume targets.
+func SessionHasContent(cwd, sessionID string) bool {
+	projDir := projectDir(cwd)
+	jsonlPath := filepath.Join(projDir, sessionID+".jsonl")
+	info, err := os.Stat(jsonlPath)
+	if err != nil || info.Size() == 0 {
+		return false
+	}
+	return true
+}
+
 // WatchSession discovers the session JSONL from the child PID, reads existing
 // entries, then tails for new ones. Runs until done is closed.
 // If onSessionID is non-nil, it is called with the discovered Claude session UUID.
