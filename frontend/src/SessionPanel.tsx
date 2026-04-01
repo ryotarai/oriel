@@ -502,12 +502,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
                   return false;
                 }
-                // Hide tool results for Edit, Write, TaskCreate, TaskUpdate
+                // Hide tool results for TaskCreate, TaskUpdate
                 if (entry.type === "tool_result") {
                   const matchingUse = entries.find(
                     (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
                   );
-                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write" || matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate")) {
+                  if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate")) {
+                    return false;
+                  }
+                  // Hide successful Edit/Write results but show errors
+                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write") && !entry.isError) {
                     return false;
                   }
                 }
