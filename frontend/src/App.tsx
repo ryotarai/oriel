@@ -56,10 +56,10 @@ export default function App() {
           showClose={panes.length > 1}
           onClose={() => removePane(pane.id)}
           onAdd={addPane}
-          onDividerDrag={(deltaPct) => {
+          onDividerDrag={(posPct) => {
             setSplits((prev) => {
               const next = [...prev];
-              next[i] = Math.max(10, Math.min(90, (next[i] ?? 50) + deltaPct));
+              next[i] = Math.max(10, Math.min(90, posPct));
               return next;
             });
           }}
@@ -86,19 +86,17 @@ interface PaneWithDividerProps {
   showClose: boolean;
   onClose: () => void;
   onAdd: () => void;
-  onDividerDrag: (deltaPct: number) => void;
+  onDividerDrag: (posPct: number) => void;
 }
 
 function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag }: PaneWithDividerProps) {
   const onDragStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      const startX = e.clientX;
 
       const onMove = (ev: MouseEvent) => {
-        const deltaPx = ev.clientX - startX;
-        const deltaPct = (deltaPx / window.innerWidth) * 100;
-        onDividerDrag(deltaPct);
+        const posPct = (ev.clientX / window.innerWidth) * 100;
+        onDividerDrag(posPct);
       };
       const onUp = () => {
         document.removeEventListener("mousemove", onMove);
