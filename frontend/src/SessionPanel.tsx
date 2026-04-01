@@ -49,6 +49,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
   const [activeTab, setActiveTab] = useState<"conversation" | "diff" | "files">("conversation");
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
+  const [showTools, setShowTools] = useState(false);
 
   const sendInputToTerminal = useCallback((text: string) => {
     const ws = wsRef.current;
@@ -327,6 +328,15 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
           >
             Files
           </button>
+          <label className="ml-auto flex items-center gap-1.5 px-3 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showTools}
+              onChange={(e) => setShowTools(e.target.checked)}
+              className="accent-blue-500"
+            />
+            Show tools
+          </label>
         </div>
 
         {/* Tab content */}
@@ -349,7 +359,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
                   Messages will appear here...
                 </div>
               )}
-              {entries.map((entry) => (
+              {entries.filter((entry) => showTools || (entry.type !== "tool_use" && entry.type !== "tool_result")).map((entry) => (
                 <MessageBubble key={entry.uuid} entry={entry} onOpenFile={openFileInExplorer} />
               ))}
               <div ref={chatEndRef} />
