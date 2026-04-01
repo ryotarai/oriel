@@ -27,18 +27,18 @@ export default function App() {
   // Split positions between panes (percentage of total width for each divider)
   const [splits, setSplits] = useState<number[]>([]);
 
-  const addPane = useCallback(() => {
+  const addPaneAt = useCallback((afterIndex: number) => {
     const newId = `pane-${Date.now()}`;
     const newSessionId = `session-${Date.now()}`;
-    setPanes((prev) => [...prev, { id: newId, sessionId: newSessionId }]);
-    // Distribute evenly
-    setSplits((prev) => {
-      const count = prev.length + 2; // new pane count
+    setPanes((prev) => {
+      const next = [...prev];
+      next.splice(afterIndex + 1, 0, { id: newId, sessionId: newSessionId });
       const positions: number[] = [];
-      for (let i = 1; i < count; i++) {
-        positions.push((i / count) * 100);
+      for (let i = 1; i < next.length; i++) {
+        positions.push((i / next.length) * 100);
       }
-      return positions;
+      setSplits(positions);
+      return next;
     });
   }, []);
 
@@ -88,7 +88,7 @@ export default function App() {
               isLast={i === panes.length - 1}
               showClose={panes.length > 1}
               onClose={() => removePane(pane.id)}
-              onAdd={addPane}
+              onAdd={() => addPaneAt(i)}
               onDividerDrag={(posPct) => {
                 setSplits((prev) => {
                   const next = [...prev];
@@ -172,15 +172,13 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           >
             ↻
           </button>
-          {isLast && (
-            <button
-              onClick={onAdd}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
-              title="Add pane"
-            >
-              +
-            </button>
-          )}
+          <button
+            onClick={onAdd}
+            className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
+            title="Add pane"
+          >
+            +
+          </button>
           {showClose && (
             <button
               onClick={onClose}
