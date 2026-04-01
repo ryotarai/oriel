@@ -230,6 +230,7 @@ function HighlightedCode({ content, path, onSendInput }: { content: string; path
           lineHtml={lineHtml}
           rawText={rawLines[i] ?? ""}
           filePath={path}
+          lineNumber={i + 1}
           onSendInput={onSendInput}
         />
       ))}
@@ -275,10 +276,11 @@ function splitHtmlByLines(html: string): string[] {
   return lines;
 }
 
-function LineWithButton({ lineHtml, rawText, filePath, onSendInput }: {
+function LineWithButton({ lineHtml, rawText, filePath, lineNumber, onSendInput }: {
   lineHtml: string;
   rawText: string;
   filePath: string;
+  lineNumber: number;
   onSendInput?: (text: string) => void;
 }) {
   return (
@@ -287,7 +289,7 @@ function LineWithButton({ lineHtml, rawText, filePath, onSendInput }: {
         {onSendInput && (
           <button
             onClick={() => {
-              onSendInput(`@${filePath}\n\`\`\`\n${rawText}\n\`\`\`\n`);
+              onSendInput(`@${filePath}:${lineNumber}\n\`\`\`\n${rawText}\n\`\`\`\n`);
             }}
             className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 transition-opacity p-0.5"
             title="Send line to Claude"

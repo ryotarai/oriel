@@ -104,25 +104,45 @@ export function DiffPanel({ files, onSendInput }: DiffPanelProps) {
 function DiffBlock({ diff, filePath, onSendInput }: { diff: string; filePath: string; onSendInput?: (text: string) => void }) {
   const lines = diff.split("\n");
 
+  // Track line numbers from @@ hunk headers
+  let oldLine = 0;
+  let newLine = 0;
+
   return (
     <pre className="text-xs font-mono leading-5 px-0 py-1">
       {lines.map((line, i) => {
         let className = "";
+        let lineNumber: number | null = null;
+
         if (line.startsWith("+++ ") || line.startsWith("--- ")) {
           className += "text-gray-500";
         } else if (line.startsWith("@@")) {
           className += "text-blue-400 bg-blue-900/20";
+          const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+          if (match) {
+            oldLine = parseInt(match[1], 10);
+            newLine = parseInt(match[2], 10);
+          }
         } else if (line.startsWith("+")) {
           className += "text-green-300 bg-green-900/20";
+          lineNumber = newLine;
+          newLine++;
         } else if (line.startsWith("-")) {
           className += "text-red-300 bg-red-900/20";
+          lineNumber = oldLine;
+          oldLine++;
         } else if (line.startsWith("diff --git")) {
           return null; // skip diff header lines
         } else if (line.startsWith("index ")) {
           return null; // skip index lines
         } else {
           className += "text-gray-400";
+          lineNumber = newLine;
+          oldLine++;
+          newLine++;
         }
+
+        const ref = lineNumber != null ? `@${filePath}:${lineNumber}` : `@${filePath}`;
 
         return (
           <div key={i} className={`group flex ${className}`}>
@@ -130,7 +150,7 @@ function DiffBlock({ diff, filePath, onSendInput }: { diff: string; filePath: st
               {onSendInput && (
                 <button
                   onClick={() => {
-                    onSendInput(`@${filePath}\n\`\`\`\n${line}\n\`\`\`\n`);
+                    onSendInput(`${ref}\n\`\`\`\n${line}\n\`\`\`\n`);
                   }}
                   className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-blue-400 transition-opacity p-0.5"
                   title="Send line to Claude"
