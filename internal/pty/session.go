@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 )
@@ -85,18 +86,31 @@ func (s *Session) Close() error {
 	s.done = true
 	s.mu.Unlock()
 
+	// Send SIGTERM to the process group so the child (and its descendants) can
+	// shut down gracefully.  Closing the pty master only delivers SIGHUP which
+	// some programs (e.g. Claude Code / Node.js) ignore.
+	if pid := s.cmd.Process.Pid; pid > 0 {
+		_ = syscall.Kill(-pid, syscall.SIGTERM)
+	}
+
 	s.ptmx.Close()
 
-	// Wait for the background goroutine to finish cmd.Wait.
-	<-s.doneCh
+	// Wait for the process to exit, but don't block forever — force-kill after
+	// a timeout so the caller can proceed.
+	select {
+	case <-s.doneCh:
+	case <-time.After(5 * time.Second):
+		_ = s.cmd.Process.Kill()
+		<-s.doneCh
+	}
 
 	err := s.waitErr
 	if err != nil {
-		// Closing the pty master sends SIGHUP to the child; treat that as a
-		// clean exit rather than a caller-visible error.
+		// Treat signal-induced exits (SIGHUP, SIGTERM, SIGKILL) as clean.
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				if status.Signal() == syscall.SIGHUP {
+				sig := status.Signal()
+				if sig == syscall.SIGHUP || sig == syscall.SIGTERM || sig == syscall.SIGKILL {
 					return nil
 				}
 			}
