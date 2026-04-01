@@ -16,10 +16,15 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/files/tree")
-      .then((r) => r.json())
-      .then(setTree)
-      .catch(() => {});
+    const poll = () => {
+      fetch("/api/files/tree")
+        .then((r) => r.json())
+        .then(setTree)
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
   }, []);
 
   // Open file when requested externally

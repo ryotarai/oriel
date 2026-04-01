@@ -15,30 +15,21 @@ type FileDiff struct {
 	Diff   *string `json:"diff"`   // nil for binary files
 }
 
-// CaptureHead returns the current HEAD commit hash in the given directory.
-// Returns empty string if the repo has no commits.
-func CaptureHead(dir string) string {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
-}
-
-// ComputeDiff returns per-file diffs between startCommit and the current working tree.
-// If startCommit is empty, returns diffs of all tracked + untracked files.
-func ComputeDiff(dir, startCommit string) ([]FileDiff, error) {
+// ComputeDiff returns per-file diffs of uncommitted changes in the working tree.
+// It combines staged and unstaged changes (diff against HEAD) plus untracked files.
+func ComputeDiff(dir string) ([]FileDiff, error) {
 	var files []FileDiff
 
-	if startCommit == "" {
-		// No commits at session start — treat everything as new
+	// Check if repo has any commits
+	headCmd := exec.Command("git", "rev-parse", "HEAD")
+	headCmd.Dir = dir
+	if err := headCmd.Run(); err != nil {
+		// No commits — treat everything as new
 		return diffNoBase(dir)
 	}
 
-	// Get changed files: git diff --name-status <startCommit>
-	nsCmd := exec.Command("git", "diff", "--name-status", startCommit)
+	// Get changed files: git diff HEAD --name-status (staged + unstaged)
+	nsCmd := exec.Command("git", "diff", "HEAD", "--name-status")
 	nsCmd.Dir = dir
 	nsOut, err := nsCmd.Output()
 	if err != nil {
@@ -65,7 +56,7 @@ func ComputeDiff(dir, startCommit string) ([]FileDiff, error) {
 			status = "A"
 		}
 		seen[path] = true
-		d := fileDiff(dir, startCommit, path)
+		d := fileDiffHead(dir, path)
 		files = append(files, FileDiff{Path: path, Status: status, Diff: d})
 	}
 
@@ -86,8 +77,8 @@ func ComputeDiff(dir, startCommit string) ([]FileDiff, error) {
 	return files, nil
 }
 
-func fileDiff(dir, startCommit, path string) *string {
-	cmd := exec.Command("git", "diff", startCommit, "--", path)
+func fileDiffHead(dir, path string) *string {
+	cmd := exec.Command("git", "diff", "HEAD", "--", path)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {

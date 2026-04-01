@@ -50,9 +50,8 @@ type session struct {
 	// Current terminal size (for restart)
 	cols, rows uint16
 
-	// Git state captured at session start
-	startCommit string
-	cwd         string
+	// Working directory for diff/file operations
+	cwd string
 
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
@@ -131,7 +130,6 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	s.pty = ptySess
 	s.exited = false
 	s.cwd = cwd
-	s.startCommit = diff.CaptureHead(cwd)
 	s.mu.Unlock()
 
 	go h.readPtyLoop(s)
@@ -344,11 +342,10 @@ func (h *Handler) HandleDiff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	startCommit := s.startCommit
 	cwd := s.cwd
 	s.mu.Unlock()
 
-	files, err := diff.ComputeDiff(cwd, startCommit)
+	files, err := diff.ComputeDiff(cwd)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
