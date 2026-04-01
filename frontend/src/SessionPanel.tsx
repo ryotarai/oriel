@@ -113,7 +113,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
     const term = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
+      fontSize: 12,
       fontFamily: "Menlo, Monaco, 'Courier New', monospace",
       theme: {
         background: "#0a0a0f",
