@@ -909,31 +909,42 @@ function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
 }
 
 function TaskOverlay({ tasks }: { tasks: TaskItem[] }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   if (tasks.length === 0) return null;
 
   return (
     <div className="absolute top-10 right-2 z-10 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-lg backdrop-blur-sm overflow-hidden">
-      <div className="px-3 py-1.5 border-b border-gray-700 text-xs font-medium text-gray-300">
-        Tasks
+      <div className="px-3 py-1.5 border-b border-gray-700 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-300">Tasks</span>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-gray-500 hover:text-gray-300 text-xs leading-none"
+          title={collapsed ? "Expand" : "Collapse"}
+        >
+          {collapsed ? "+" : "−"}
+        </button>
       </div>
-      <div className="max-h-48 overflow-y-auto">
-        {tasks.map((task) => (
-          <div key={task.taskId} className="px-3 py-1 flex items-center gap-2 text-xs">
-            <span className={
-              task.status === "completed" ? "text-green-400" :
-              task.status === "in_progress" ? "text-yellow-400" :
-              "text-gray-500"
-            }>
-              {task.status === "completed" ? "✓" : task.status === "in_progress" ? "●" : "○"}
-            </span>
-            <span className={
-              task.status === "completed" ? "text-gray-500 line-through" : "text-gray-300"
-            }>
-              {task.subject}
-            </span>
-          </div>
-        ))}
-      </div>
+      {!collapsed && (
+        <div className="max-h-48 overflow-y-auto">
+          {tasks.map((task) => (
+            <div key={task.taskId} className="px-3 py-1 flex items-center gap-2 text-xs">
+              <span className={
+                task.status === "completed" ? "text-green-400" :
+                task.status === "in_progress" ? "text-yellow-400" :
+                "text-gray-500"
+              }>
+                {task.status === "completed" ? "✓" : task.status === "in_progress" ? "●" : "○"}
+              </span>
+              <span className={
+                task.status === "completed" ? "text-gray-500 line-through" : "text-gray-300"
+              }>
+                {task.subject}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
