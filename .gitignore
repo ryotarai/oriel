@@ -5,3 +5,4 @@ dist/
 .playwright-mcp/
 /bin/
 /tmp/
+.DS_Store
