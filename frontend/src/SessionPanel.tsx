@@ -15,6 +15,7 @@ interface ConversationEntry {
 
 export function SessionPanel({ sessionId }: { sessionId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -48,6 +49,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     term.loadAddon(fit);
     term.open(containerRef.current);
     fit.fit();
+    termRef.current = term;
     fitRef.current = fit;
 
     const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}`;
@@ -134,8 +136,12 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Chat panel (top) */}
-      <div style={{ height: `${splitPct}%` }} className="flex flex-col min-h-0">
+      {/* Chat panel (top) — clicking focuses the terminal for input */}
+      <div
+        style={{ height: `${splitPct}%` }}
+        className="flex flex-col min-h-0 cursor-text"
+        onClick={() => termRef.current?.focus()}
+      >
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {!connected && (
             <div className="text-center text-yellow-400 text-sm">Connecting...</div>
