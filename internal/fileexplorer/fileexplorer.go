@@ -184,6 +184,86 @@ func findFileByName(root, name string) string {
 	return result
 }
 
+// HandleDirs returns a flat list of subdirectories for directory browsing.
+func HandleDirs(w http.ResponseWriter, r *http.Request) {
+	dir := r.URL.Query().Get("path")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		dir = home
+	}
+
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Verify the path is a directory
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"path":    dir,
+			"parent":  filepath.Dir(dir),
+			"entries": []interface{}{},
+		})
+		return
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		// Permission denied or other error — return empty list
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"path":    dir,
+			"parent":  filepath.Dir(dir),
+			"entries": []interface{}{},
+		})
+		return
+	}
+
+	type DirEntry struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	}
+
+	skipDirs := map[string]bool{
+		".git":         true,
+		"node_modules": true,
+	}
+
+	var dirs []DirEntry
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if skipDirs[e.Name()] {
+			continue
+		}
+		dirs = append(dirs, DirEntry{
+			Name: e.Name(),
+			Path: filepath.Join(dir, e.Name()),
+		})
+	}
+
+	sort.Slice(dirs, func(i, j int) bool {
+		return dirs[i].Name < dirs[j].Name
+	})
+
+	parent := filepath.Dir(dir)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"path":    dir,
+		"parent":  parent,
+		"entries": dirs,
+	})
+}
+
 func shouldSkip(name string, mode fs.FileMode) bool {
 	if mode&fs.ModeSymlink != 0 {
 		return true

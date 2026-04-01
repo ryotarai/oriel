@@ -107,6 +107,24 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   // CWD picker
   const [showCwdPicker, setShowCwdPicker] = useState(false);
   const [cwdInput, setCwdInput] = useState(cwd ?? "");
+  const [cwdBrowsePath, setCwdBrowsePath] = useState(cwd ?? "");
+  const [cwdDirEntries, setCwdDirEntries] = useState<{ name: string; path: string }[]>([]);
+  const [cwdDirLoading, setCwdDirLoading] = useState(false);
+
+  const fetchDirs = useCallback((dirPath: string) => {
+    setCwdDirLoading(true);
+    const params = new URLSearchParams();
+    if (dirPath) params.set("path", dirPath);
+    fetch(`/api/dirs?${params}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { path: string; parent: string; entries: { name: string; path: string }[] }) => {
+        setCwdBrowsePath(data.path);
+        setCwdInput(data.path);
+        setCwdDirEntries(data.entries ?? []);
+      })
+      .catch(() => setCwdDirEntries([]))
+      .finally(() => setCwdDirLoading(false));
+  }, []);
 
   const handleConversation = useCallback((entry: ConversationEntry) => {
     if (seenUUIDs.current.has(entry.uuid)) return;
@@ -138,8 +156,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
   useImperativeHandle(ref, () => ({
     openResumeModal,
-    openCwdPicker: () => setShowCwdPicker(true),
-  }), [openResumeModal]);
+    openCwdPicker: () => { setShowCwdPicker(true); fetchDirs(cwd ?? ""); },
+  }), [openResumeModal, fetchDirs, cwd]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -523,25 +541,57 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       {/* CWD picker modal */}
       {showCwdPicker && (
         <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-md p-4">
-            <h3 className="text-gray-100 text-sm font-medium mb-3">Change Working Directory</h3>
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-md p-4 flex flex-col max-h-[80vh]">
+            <h3 className="text-gray-100 text-sm font-medium mb-2">Change Working Directory</h3>
             <p className="text-yellow-400 text-xs mb-3">This will restart the Claude Code session.</p>
             <input
               type="text"
               value={cwdInput}
               onChange={(e) => setCwdInput(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 text-gray-200 text-sm px-3 py-1.5 rounded font-mono"
+              className="w-full bg-gray-800 border border-gray-600 text-gray-200 text-sm px-3 py-1.5 rounded font-mono mb-2 shrink-0"
               placeholder="/path/to/directory"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter" && cwdInput.trim()) {
-                  onCwdChange?.(cwdInput.trim());
-                  setShowCwdPicker(false);
+                  fetchDirs(cwdInput.trim());
                 }
                 if (e.key === "Escape") setShowCwdPicker(false);
               }}
             />
-            <div className="flex justify-end gap-2 mt-3">
+            <div className="flex-1 overflow-y-auto border border-gray-700 rounded bg-gray-800 min-h-0">
+              {cwdDirLoading ? (
+                <div className="text-gray-500 text-xs p-3">Loading...</div>
+              ) : (
+                <div className="divide-y divide-gray-700/50">
+                  {cwdBrowsePath !== "/" && (
+                    <button
+                      className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                      onClick={() => {
+                        const parent = cwdBrowsePath.replace(/\/[^/]+$/, "") || "/";
+                        fetchDirs(parent);
+                      }}
+                    >
+                      <span className="text-gray-500">&#128193;</span>
+                      <span>..</span>
+                    </button>
+                  )}
+                  {cwdDirEntries.map((entry) => (
+                    <button
+                      key={entry.path}
+                      className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                      onClick={() => fetchDirs(entry.path)}
+                    >
+                      <span className="text-gray-500">&#128193;</span>
+                      <span className="truncate">{entry.name}</span>
+                    </button>
+                  ))}
+                  {cwdDirEntries.length === 0 && (
+                    <div className="text-gray-500 text-xs p-3">No subdirectories</div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-3 shrink-0">
               <button
                 onClick={() => setShowCwdPicker(false)}
                 className="text-gray-400 text-xs px-3 py-1 rounded hover:bg-gray-800"
@@ -550,14 +600,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               </button>
               <button
                 onClick={() => {
-                  if (cwdInput.trim()) {
-                    onCwdChange?.(cwdInput.trim());
+                  if (cwdBrowsePath.trim()) {
+                    onCwdChange?.(cwdBrowsePath.trim());
                     setShowCwdPicker(false);
                   }
                 }}
                 className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-500"
               >
-                Change
+                Select
               </button>
             </div>
           </div>

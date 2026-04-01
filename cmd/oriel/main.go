@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
 	mux.HandleFunc("/api/diff", handler.HandleDiff)
+	mux.HandleFunc("/api/dirs", fileexplorer.HandleDirs)
 	mux.HandleFunc("/api/files/tree", fileexplorer.HandleTree)
 	mux.HandleFunc("/api/files/read", fileexplorer.HandleFile)
 	mux.HandleFunc("/api/config", handleConfig)
