@@ -328,22 +328,25 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
           >
             Files
           </button>
-          <label className="ml-auto flex items-center gap-1.5 px-3 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={showTools}
-              onChange={(e) => setShowTools(e.target.checked)}
-              className="accent-blue-500"
-            />
-            Show tools
-          </label>
         </div>
 
         {/* Tab content */}
         {activeTab === "conversation" ? (
-          <div
-            ref={chatScrollRef}
-            className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col min-h-0 cursor-text"
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex items-center px-3 py-1 border-b border-gray-800">
+              <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showTools}
+                  onChange={(e) => setShowTools(e.target.checked)}
+                  className="accent-blue-500"
+                />
+                Show tools
+              </label>
+            </div>
+            <div
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col min-h-0 cursor-text"
             onClick={() => {
               const sel = window.getSelection();
               if (sel && sel.toString().length > 0) return;
@@ -364,6 +367,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
               ))}
               <div ref={chatEndRef} />
             </div>
+          </div>
           </div>
         ) : activeTab === "diff" ? (
           <div className="flex-1 flex flex-col min-h-0">
