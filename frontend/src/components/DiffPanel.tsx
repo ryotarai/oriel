@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 
 export interface FileDiffData {
   path: string;
@@ -32,6 +32,7 @@ function statusBgColor(status: string): string {
 export function DiffPanel({ files, onSendInput }: DiffPanelProps) {
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [wrapLines, setWrapLines] = useState(true);
 
   const scrollToFile = useCallback((path: string) => {
     const el = sectionRefs.current.get(path);
@@ -52,56 +53,69 @@ export function DiffPanel({ files, onSendInput }: DiffPanelProps) {
   }
 
   return (
-    <div className="flex flex-1 min-h-0">
-      {/* File tree (left) */}
-      <div className="w-60 flex-shrink-0 border-r border-gray-800 overflow-y-auto">
-        {files.map((f) => (
-          <button
-            key={f.path}
-            onClick={() => scrollToFile(f.path)}
-            className="w-full text-left px-3 py-1.5 hover:bg-gray-800/60 text-xs font-mono flex items-center gap-2 transition-colors"
-          >
-            <span className={`font-bold flex-shrink-0 w-4 text-center ${statusColor(f.status)}`}>
-              {f.status}
-            </span>
-            <span className="text-gray-500 truncate">
-              {f.path.includes("/") ? f.path.substring(0, f.path.lastIndexOf("/") + 1) : ""}
-              <span className="text-gray-200">
-                {f.path.includes("/") ? f.path.substring(f.path.lastIndexOf("/") + 1) : f.path}
-              </span>
-            </span>
-          </button>
-        ))}
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center px-3 py-1 border-b border-gray-800">
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={wrapLines}
+            onChange={(e) => setWrapLines(e.target.checked)}
+            className="accent-blue-500"
+          />
+          Wrap lines
+        </label>
       </div>
-
-      {/* Diff sections (right) */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-        {files.map((f) => (
-          <div
-            key={f.path}
-            ref={(el) => { if (el) sectionRefs.current.set(f.path, el); }}
-          >
-            {/* File header */}
-            <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 px-4 py-2 flex items-center gap-2">
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${statusBgColor(f.status)}`}>
+      <div className="flex flex-1 min-h-0">
+        {/* File tree (left) */}
+        <div className="w-60 flex-shrink-0 border-r border-gray-800 overflow-y-auto">
+          {files.map((f) => (
+            <button
+              key={f.path}
+              onClick={() => scrollToFile(f.path)}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-800/60 text-xs font-mono flex items-center gap-2 transition-colors"
+            >
+              <span className={`font-bold flex-shrink-0 w-4 text-center ${statusColor(f.status)}`}>
                 {f.status}
               </span>
-              <span className="text-sm font-mono text-gray-200">{f.path}</span>
+              <span className="text-gray-500 truncate">
+                {f.path.includes("/") ? f.path.substring(0, f.path.lastIndexOf("/") + 1) : ""}
+                <span className="text-gray-200">
+                  {f.path.includes("/") ? f.path.substring(f.path.lastIndexOf("/") + 1) : f.path}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Diff sections (right) */}
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+          {files.map((f) => (
+            <div
+              key={f.path}
+              ref={(el) => { if (el) sectionRefs.current.set(f.path, el); }}
+            >
+              {/* File header */}
+              <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 px-4 py-2 flex items-center gap-2">
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${statusBgColor(f.status)}`}>
+                  {f.status}
+                </span>
+                <span className="text-sm font-mono text-gray-200">{f.path}</span>
+              </div>
+              {/* Diff content */}
+              {f.diff ? (
+                <DiffBlock diff={f.diff} filePath={f.path} onSendInput={onSendInput} wrapLines={wrapLines} />
+              ) : (
+                <div className="px-4 py-3 text-gray-500 text-xs italic">Binary file</div>
+              )}
             </div>
-            {/* Diff content */}
-            {f.diff ? (
-              <DiffBlock diff={f.diff} filePath={f.path} onSendInput={onSendInput} />
-            ) : (
-              <div className="px-4 py-3 text-gray-500 text-xs italic">Binary file</div>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function DiffBlock({ diff, filePath, onSendInput }: { diff: string; filePath: string; onSendInput?: (text: string) => void }) {
+function DiffBlock({ diff, filePath, onSendInput, wrapLines }: { diff: string; filePath: string; onSendInput?: (text: string) => void; wrapLines: boolean }) {
   const lines = diff.split("\n");
 
   // Track line numbers from @@ hunk headers
@@ -109,7 +123,7 @@ function DiffBlock({ diff, filePath, onSendInput }: { diff: string; filePath: st
   let newLine = 0;
 
   return (
-    <pre className="text-xs font-mono leading-5 px-0 py-1">
+    <pre className={`text-xs font-mono leading-5 px-0 py-1 ${wrapLines ? "whitespace-pre-wrap break-all" : "whitespace-pre"}`}>
       {lines.map((line, i) => {
         let className = "";
         let lineNumber: number | null = null;

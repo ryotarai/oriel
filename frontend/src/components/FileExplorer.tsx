@@ -14,6 +14,7 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [wrapLines, setWrapLines] = useState(true);
 
   useEffect(() => {
     const poll = () => {
@@ -58,52 +59,65 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
   }, []);
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* File tree (left pane) */}
-      <div className="w-64 flex-shrink-0 border-r border-gray-700 overflow-y-auto text-sm">
-        {tree ? (
-          <div className="py-1">
-            {tree.children?.map((node) => (
-              <TreeItem
-                key={node.path || node.name}
-                node={node}
-                depth={0}
-                selectedPath={selectedPath}
-                onSelect={openFile}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-gray-500 text-xs p-3">Loading...</div>
-        )}
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center px-3 py-1 border-b border-gray-800">
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={wrapLines}
+            onChange={(e) => setWrapLines(e.target.checked)}
+            className="accent-blue-500"
+          />
+          Wrap lines
+        </label>
       </div>
-
-      {/* File viewer (right pane) */}
-      <div className="flex-1 overflow-auto min-w-0">
-        {selectedPath ? (
-          loading ? (
-            <div className="text-gray-500 text-sm p-4">Loading...</div>
-          ) : (
-            <div className="flex flex-col h-full">
-              <div className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/50">
-                {selectedPath}
-              </div>
-              <div className="flex-1 overflow-auto">
-                {isBinary ? (
-                  <div className="text-gray-500 text-sm p-4 flex items-center justify-center h-full">
-                    Binary file
-                  </div>
-                ) : (
-                  <HighlightedCode content={fileContent ?? ""} path={selectedPath} onSendInput={onSendInput} />
-                )}
-              </div>
+      <div className="flex flex-1 min-h-0">
+        {/* File tree (left pane) */}
+        <div className="w-64 flex-shrink-0 border-r border-gray-700 overflow-y-auto text-sm">
+          {tree ? (
+            <div className="py-1">
+              {tree.children?.map((node) => (
+                <TreeItem
+                  key={node.path || node.name}
+                  node={node}
+                  depth={0}
+                  selectedPath={selectedPath}
+                  onSelect={openFile}
+                />
+              ))}
             </div>
-          )
-        ) : (
-          <div className="text-gray-500 text-sm p-4 flex items-center justify-center h-full">
-            Select a file to view
-          </div>
-        )}
+          ) : (
+            <div className="text-gray-500 text-xs p-3">Loading...</div>
+          )}
+        </div>
+
+        {/* File viewer (right pane) */}
+        <div className="flex-1 overflow-auto min-w-0">
+          {selectedPath ? (
+            loading ? (
+              <div className="text-gray-500 text-sm p-4">Loading...</div>
+            ) : (
+              <div className="flex flex-col h-full">
+                <div className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/50">
+                  {selectedPath}
+                </div>
+                <div className="flex-1 overflow-auto">
+                  {isBinary ? (
+                    <div className="text-gray-500 text-sm p-4 flex items-center justify-center h-full">
+                      Binary file
+                    </div>
+                  ) : (
+                    <HighlightedCode content={fileContent ?? ""} path={selectedPath} onSendInput={onSendInput} wrapLines={wrapLines} />
+                  )}
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="text-gray-500 text-sm p-4 flex items-center justify-center h-full">
+              Select a file to view
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -209,7 +223,7 @@ function extensionToLanguage(path: string): string | undefined {
   return undefined;
 }
 
-function HighlightedCode({ content, path, onSendInput }: { content: string; path: string; onSendInput?: (text: string) => void }) {
+function HighlightedCode({ content, path, onSendInput, wrapLines }: { content: string; path: string; onSendInput?: (text: string) => void; wrapLines: boolean }) {
   const lang = extensionToLanguage(path);
   let html: string;
 
@@ -228,7 +242,7 @@ function HighlightedCode({ content, path, onSendInput }: { content: string; path
   const rawLines = content.split("\n");
 
   return (
-    <pre className="text-xs font-mono py-3 leading-relaxed text-gray-200">
+    <pre className={`text-xs font-mono py-3 leading-relaxed text-gray-200 ${wrapLines ? "whitespace-pre-wrap break-all" : "whitespace-pre"}`}>
       {htmlLines.map((lineHtml, i) => (
         <LineWithButton
           key={i}
