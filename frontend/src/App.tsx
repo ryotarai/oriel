@@ -21,9 +21,12 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
-  const [chatOpen, setChatOpen] = useState(true);
   const seenUUIDs = useRef(new Set<string>());
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Split position: percentage of viewport height for chat panel
+  const [splitPct, setSplitPct] = useState(40);
+  const dragging = useRef(false);
 
   const handleConversation = useCallback((entry: ConversationEntry) => {
     if (seenUUIDs.current.has(entry.uuid)) return;
@@ -101,53 +104,68 @@ export default function App() {
     };
   }, [handleConversation]);
 
-  // Re-fit terminal when chat panel toggles
+  // Re-fit terminal when split changes
   useEffect(() => {
-    setTimeout(() => fitRef.current?.fit(), 50);
-  }, [chatOpen]);
+    const id = setTimeout(() => fitRef.current?.fit(), 50);
+    return () => clearTimeout(id);
+  }, [splitPct]);
 
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries]);
 
+  // Drag handling
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const pct = (ev.clientY / window.innerHeight) * 100;
+      setSplitPct(Math.max(10, Math.min(90, pct)));
+    };
+    const onUp = () => {
+      dragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      // Re-fit after drag ends
+      setTimeout(() => fitRef.current?.fit(), 50);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
+
   return (
-    <div className="h-screen w-screen bg-[#0a0a0f] flex">
-      {/* Terminal */}
-      <div className={`flex flex-col ${chatOpen ? "w-1/2" : "flex-1"}`}>
-        {!connected && (
-          <div className="p-2 text-center text-yellow-400 text-sm">Connecting...</div>
-        )}
-        <div ref={containerRef} className="flex-1" />
+    <div className="h-screen w-screen bg-[#0a0a0f] flex flex-col overflow-hidden">
+      {/* Chat panel (top) */}
+      <div style={{ height: `${splitPct}%` }} className="flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {!connected && (
+            <div className="text-center text-yellow-400 text-sm">Connecting...</div>
+          )}
+          {entries.length === 0 && connected && (
+            <div className="text-gray-600 text-sm text-center mt-8">
+              Messages will appear here...
+            </div>
+          )}
+          {entries.map((entry) => (
+            <MessageBubble key={entry.uuid} entry={entry} />
+          ))}
+          <div ref={chatEndRef} />
+        </div>
       </div>
 
-      {/* Toggle button */}
-      <button
-        onClick={() => setChatOpen(!chatOpen)}
-        className="absolute top-2 right-2 z-10 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded border border-gray-600"
-      >
-        {chatOpen ? "Hide Chat" : "Show Chat"}
-      </button>
+      {/* Drag handle */}
+      <div
+        onMouseDown={onDragStart}
+        className="h-1.5 bg-gray-800 hover:bg-blue-600 cursor-row-resize flex-shrink-0 transition-colors"
+      />
 
-      {/* Chat panel */}
-      {chatOpen && (
-        <div className="w-1/2 border-l border-gray-700 flex flex-col bg-gray-950">
-          <div className="p-2 border-b border-gray-800 text-gray-400 text-xs font-medium">
-            Conversation (Markdown)
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {entries.length === 0 && (
-              <div className="text-gray-600 text-sm text-center mt-8">
-                Messages will appear here...
-              </div>
-            )}
-            {entries.map((entry) => (
-              <MessageBubble key={entry.uuid} entry={entry} />
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-        </div>
-      )}
+      {/* Terminal (bottom) */}
+      <div style={{ height: `${100 - splitPct}%` }} className="min-h-0">
+        <div ref={containerRef} className="h-full" />
+      </div>
     </div>
   );
 }
@@ -156,7 +174,7 @@ function MessageBubble({ entry }: { entry: ConversationEntry }) {
   if (entry.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100 text-sm">
+        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100 text-sm whitespace-pre-wrap">
           {entry.text}
         </div>
       </div>
