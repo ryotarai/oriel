@@ -334,7 +334,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
         {activeTab === "conversation" ? (
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex items-center px-3 py-1 border-b border-gray-800">
-              <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={showTools}
