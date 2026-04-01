@@ -112,7 +112,7 @@ export default function App() {
           {/* Settings button */}
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="absolute top-1 left-1 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
+            className="fixed bottom-2 right-2 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
             title="Settings"
           >
             ⚙
