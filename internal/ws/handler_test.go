@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	wslib "github.com/ryotarai/claude-code-wrapper-ui/internal/ws"
+	wslib "github.com/ryotarai/oriel/internal/ws"
 )
 
 type wsMessage struct {

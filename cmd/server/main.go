@@ -12,10 +12,10 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/ryotarai/claude-code-wrapper-ui/frontend"
-	"github.com/ryotarai/claude-code-wrapper-ui/internal/auth"
-	"github.com/ryotarai/claude-code-wrapper-ui/internal/fileexplorer"
-	"github.com/ryotarai/claude-code-wrapper-ui/internal/ws"
+	"github.com/ryotarai/oriel/frontend"
+	"github.com/ryotarai/oriel/internal/auth"
+	"github.com/ryotarai/oriel/internal/fileexplorer"
+	"github.com/ryotarai/oriel/internal/ws"
 )
 
 func main() {

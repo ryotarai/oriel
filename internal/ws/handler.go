@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/ryotarai/claude-code-wrapper-ui/internal/conversation"
-	"github.com/ryotarai/claude-code-wrapper-ui/internal/diff"
-	ptylib "github.com/ryotarai/claude-code-wrapper-ui/internal/pty"
+	"github.com/ryotarai/oriel/internal/conversation"
+	"github.com/ryotarai/oriel/internal/diff"
+	ptylib "github.com/ryotarai/oriel/internal/pty"
 )
 
 var upgrader = websocket.Upgrader{

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	ptylib "github.com/ryotarai/claude-code-wrapper-ui/internal/pty"
+	ptylib "github.com/ryotarai/oriel/internal/pty"
 )
 
 func TestSession_StartAndWrite(t *testing.T) {

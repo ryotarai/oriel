@@ -1,4 +1,4 @@
-module github.com/ryotarai/claude-code-wrapper-ui
+module github.com/ryotarai/oriel
 
 go 1.26.1
 

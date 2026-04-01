@@ -1,4 +1,4 @@
-# Claude Code Wrapper UI
+# Oriel
 
 A web-based interface that wraps [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, adding a conversation viewer, diff inspector, and file explorer alongside the terminal.
 
@@ -21,8 +21,8 @@ A web-based interface that wraps [Claude Code](https://docs.anthropic.com/en/doc
 ## Installation
 
 ```bash
-git clone https://github.com/ryotarai/claude-code-wrapper-ui.git
-cd claude-code-wrapper-ui
+git clone https://github.com/ryotarai/oriel.git
+cd oriel
 make build
 ```
 

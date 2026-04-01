@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const cookieName = "claude-code-wrapper-token"
+const cookieName = "oriel-token"
 
 // GenerateToken returns a cryptographically random hex token.
 func GenerateToken() string {
