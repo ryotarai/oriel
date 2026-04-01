@@ -16,13 +16,16 @@ build-all: frontend-build
 frontend-build:
 	cd frontend && npm run build
 
-test: test-go test-frontend
+test: test-go test-frontend test-e2e
 
 test-go:
 	go test ./... -v -count=1
 
 test-frontend:
 	cd frontend && npx vitest run
+
+test-e2e: build
+	cd tests/e2e && npx playwright test
 
 clean:
 	rm -f bin/oriel
