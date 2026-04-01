@@ -86,7 +86,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [worktreeDir, setWorktreeDir] = useState("");
   const [running, setRunning] = useState(false);
-  const runningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const effectiveDir = worktreeDir || cwd || "";
 
@@ -199,9 +198,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (msg.type === "output") {
         const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
         term.write(bytes);
-        setRunning(true);
-        if (runningTimer.current) clearTimeout(runningTimer.current);
-        runningTimer.current = setTimeout(() => setRunning(false), 1500);
       } else if (msg.type === "conversation_reset") {
         term.reset();
         seenUUIDs.current.clear();
@@ -347,6 +343,22 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
 
     setTasks(Array.from(taskMap.values()));
+  }, [entries]);
+
+  // Detect running state from conversation entries
+  useEffect(() => {
+    if (entries.length === 0) {
+      setRunning(false);
+      return;
+    }
+    const last = entries[entries.length - 1];
+    // Claude is running when the last entry is from the assistant (actively producing output)
+    // or a tool_use (tool is executing)
+    if (last.type === "tool_use" || (last.role === "assistant" && last.type !== "tool_result")) {
+      setRunning(true);
+    } else {
+      setRunning(false);
+    }
   }, [entries]);
 
   // Quote-reply: press "r" with selected text to insert as quote into terminal
