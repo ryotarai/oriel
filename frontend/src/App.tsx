@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { SessionPanel } from "./SessionPanel";
+import { useState, useCallback, useRef } from "react";
+import { SessionPanel, type SessionPanelHandle } from "./SessionPanel";
 
 interface PaneConfig {
   id: string;
@@ -90,6 +90,7 @@ interface PaneWithDividerProps {
 }
 
 function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag }: PaneWithDividerProps) {
+  const sessionRef = useRef<SessionPanelHandle>(null);
   const onDragStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -113,6 +114,13 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
       <div style={{ width: `${width}%` }} className="h-full min-w-0 relative">
         {/* Toolbar */}
         <div className="absolute top-1 right-1 z-10 flex gap-1">
+          <button
+            onClick={() => sessionRef.current?.openResumeModal()}
+            className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
+            title="Resume session"
+          >
+            ↻
+          </button>
           {isLast && (
             <button
               onClick={onAdd}
@@ -132,7 +140,7 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
             </button>
           )}
         </div>
-        <SessionPanel sessionId={pane.sessionId} />
+        <SessionPanel ref={sessionRef} sessionId={pane.sessionId} />
       </div>
       {!isLast && (
         <div

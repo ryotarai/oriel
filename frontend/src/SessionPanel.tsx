@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -28,7 +28,11 @@ interface SessionSummary {
   lastActivity: number;
 }
 
-export function SessionPanel({ sessionId }: { sessionId: string }) {
+export interface SessionPanelHandle {
+  openResumeModal: () => void;
+}
+
+export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }>(function SessionPanel({ sessionId }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -39,7 +43,6 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
-  const inputBuf = useRef("");
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
@@ -84,6 +87,10 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     }
     setLoadingSessions(false);
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    openResumeModal,
+  }), [openResumeModal]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -156,25 +163,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       return true;
     });
 
-    // Intercept /resume command from terminal input
     term.onData((data) => {
-      // Track input buffer to detect "/resume\r"
-      if (data === "\r" || data === "\n") {
-        const cmd = inputBuf.current.trim();
-        if (cmd === "/resume") {
-          inputBuf.current = "";
-          openResumeModal();
-          return; // Don't send to pty
-        }
-        inputBuf.current = "";
-      } else if (data === "\x7f") {
-        // Backspace
-        inputBuf.current = inputBuf.current.slice(0, -1);
-      } else if (data.length === 1 && data >= " ") {
-        inputBuf.current += data;
-      }
-
-      // Forward to pty
       if (ws.readyState === WebSocket.OPEN) {
         const bytes = new TextEncoder().encode(data);
         const base64 = btoa(String.fromCharCode(...bytes));
@@ -196,7 +185,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       ws.close();
       term.dispose();
     };
-  }, [sessionId, handleConversation, openResumeModal]);
+  }, [sessionId, handleConversation]);
 
   // Re-fit when vertical split changes
   useEffect(() => {
@@ -389,7 +378,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
       )}
     </div>
   );
-}
+});
 
 function ResumeModal({
   sessions,
