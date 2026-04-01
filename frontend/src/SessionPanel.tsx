@@ -48,6 +48,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
@@ -237,6 +238,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       const text = sel?.toString();
       if (!text) return;
 
+      // Only act if the selection is within this panel
+      const anchor = sel?.anchorNode;
+      if (!anchor || !panelRef.current?.contains(anchor as Node)) return;
+
       const ws = wsRef.current;
       const term = termRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN || !term) return;
@@ -290,7 +295,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   return (
-    <div className="h-full flex flex-col overflow-hidden relative">
+    <div ref={panelRef} className="h-full flex flex-col overflow-hidden relative">
       {/* Chat panel (top) */}
       <div
         style={{ height: `${splitPct}%` }}
