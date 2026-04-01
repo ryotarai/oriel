@@ -20,6 +20,10 @@ A web-based interface that wraps [Claude Code](https://docs.anthropic.com/en/doc
 
 ## Installation
 
+Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page and place it somewhere in your PATH.
+
+### Build from source
+
 ```bash
 git clone https://github.com/ryotarai/oriel.git
 cd oriel
@@ -27,12 +31,6 @@ make build
 ```
 
 This produces a single binary at `./bin/oriel` with the frontend assets embedded.
-
-### Cross-platform builds
-
-```bash
-make build-all   # builds for linux/darwin × amd64/arm64 under bin/
-```
 
 ## Usage
 
