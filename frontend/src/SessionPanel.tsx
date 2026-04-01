@@ -66,6 +66,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const swapEnterRef = useRef(swapEnterKeys ?? true);
   useEffect(() => { swapEnterRef.current = swapEnterKeys ?? true; }, [swapEnterKeys]);
 
+  const onCwdChangeRef = useRef(onCwdChange);
+  onCwdChangeRef.current = onCwdChange;
+
   const prevCwdRef = useRef(cwd);
   useEffect(() => {
     if (prevCwdRef.current !== cwd && cwd && prevCwdRef.current !== undefined) {
@@ -207,6 +210,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         setWorktreeDir("");
       } else if (msg.type === "worktree_changed" && msg.data) {
         setWorktreeDir(msg.data);
+      } else if (msg.type === "cwd" && msg.data) {
+        onCwdChangeRef.current?.(msg.data);
       } else if (msg.type === "conversation" && msg.entry) {
         const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
         handleConversation(entry);
@@ -354,13 +359,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       return;
     }
     const last = entries[entries.length - 1];
-    // Claude is running when the last entry is from the assistant (actively producing output)
-    // or a tool_use (tool is executing)
-    if (last.type === "tool_use" || (last.role === "assistant" && last.type !== "tool_result")) {
-      setRunning(true);
-    } else {
-      setRunning(false);
-    }
+    // Claude is done when the last entry is assistant text (final response).
+    // Otherwise (tool_use, tool_result, user input), Claude is actively working.
+    setRunning(last.type !== "assistant");
   }, [entries]);
 
   // Quote-reply: press "r" with selected text to insert as quote into terminal

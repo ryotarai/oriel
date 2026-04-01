@@ -435,6 +435,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sub.writeJSON(message{Type: "conversation", Entry: entryJSON})
 	}
 
+	// Send resolved cwd to client
+	s.mu.Lock()
+	resolvedCwd := s.cwd
+	s.mu.Unlock()
+	if resolvedCwd != "" {
+		sub.writeJSON(message{Type: "cwd", Data: resolvedCwd})
+	}
+
 	if exited {
 		sub.writeJSON(message{Type: "exit"})
 		return
