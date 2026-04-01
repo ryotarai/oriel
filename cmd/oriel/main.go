@@ -15,6 +15,7 @@ import (
 
 	"github.com/ryotarai/oriel/frontend"
 	"github.com/ryotarai/oriel/internal/auth"
+	"github.com/ryotarai/oriel/internal/commits"
 	"github.com/ryotarai/oriel/internal/config"
 	"github.com/ryotarai/oriel/internal/fileexplorer"
 	"github.com/ryotarai/oriel/internal/ws"
@@ -44,6 +45,8 @@ func main() {
 	mux.HandleFunc("/api/files/tree", fileexplorer.HandleTree)
 	mux.HandleFunc("/api/files/read", fileexplorer.HandleFile)
 	mux.HandleFunc("/api/config", handleConfig)
+	mux.HandleFunc("/api/commits", commits.HandleList)
+	mux.HandleFunc("/api/commits/show", commits.HandleShow)
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)

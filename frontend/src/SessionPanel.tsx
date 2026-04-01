@@ -8,6 +8,7 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import { DiffPanel, type FileDiffData } from "./components/DiffPanel";
 import { FileExplorer } from "./components/FileExplorer";
+import { CommitsPanel } from "./components/CommitsPanel";
 
 interface ConversationEntry {
   type: string;
@@ -62,7 +63,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
-  const [activeTab, setActiveTab] = useState<"conversation" | "diff" | "files">("conversation");
+  const [activeTab, setActiveTab] = useState<"conversation" | "diff" | "files" | "commits">("conversation");
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState(false);
@@ -402,6 +403,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           >
             Files
           </button>
+          <button
+            onClick={() => setActiveTab("commits")}
+            className={`px-4 py-2 text-xs font-medium transition-colors ${
+              activeTab === "commits"
+                ? "text-gray-100 border-b-2 border-blue-500"
+                : "text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            Commits
+          </button>
         </div>
 
         {/* Tab content */}
@@ -463,6 +474,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         ) : activeTab === "diff" ? (
           <div className="flex-1 flex flex-col min-h-0">
             <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} />
+          </div>
+        ) : activeTab === "commits" ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <CommitsPanel />
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
