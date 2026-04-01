@@ -69,13 +69,7 @@ export default function App() {
     setPanes((prev) => {
       const oldIndex = prev.findIndex((p) => p.id === active.id);
       const newIndex = prev.findIndex((p) => p.id === over.id);
-      const next = arrayMove(prev, oldIndex, newIndex);
-      const positions: number[] = [];
-      for (let i = 1; i < next.length; i++) {
-        positions.push((i / next.length) * 100);
-      }
-      setSplits(positions);
-      return next;
+      return arrayMove(prev, oldIndex, newIndex);
     });
   }, []);
 
