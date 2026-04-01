@@ -32,7 +32,12 @@ export interface SessionPanelHandle {
   openResumeModal: () => void;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }>(function SessionPanel({ sessionId }, ref) {
+interface SessionPanelProps {
+  sessionId: string;
+  dragHandleProps?: Record<string, unknown>;
+}
+
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -292,7 +297,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, { sessionId: string }
         className="flex flex-col min-h-0"
       >
         {/* Tab bar */}
-        <div className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50 pr-24">
+        <div
+          className="flex-shrink-0 flex border-b border-gray-800 bg-gray-900/50 pr-24 cursor-grab active:cursor-grabbing"
+          {...dragHandleProps}
+        >
           <button
             onClick={() => setActiveTab("conversation")}
             className={`px-4 py-2 text-xs font-medium transition-colors ${

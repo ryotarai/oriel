@@ -1,4 +1,18 @@
 import { useState, useCallback, useRef } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { SessionPanel, type SessionPanelHandle } from "./SessionPanel";
 
 interface PaneConfig {
@@ -42,30 +56,57 @@ export default function App() {
     });
   }, []);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setPanes((prev) => {
+      const oldIndex = prev.findIndex((p) => p.id === active.id);
+      const newIndex = prev.findIndex((p) => p.id === over.id);
+      const next = arrayMove(prev, oldIndex, newIndex);
+      const positions: number[] = [];
+      for (let i = 1; i < next.length; i++) {
+        positions.push((i / next.length) * 100);
+      }
+      setSplits(positions);
+      return next;
+    });
+  }, []);
+
   // Calculate pane widths from split positions
   const paneWidths = computeWidths(panes.length, splits);
 
   return (
-    <div className="h-screen w-screen bg-[#0a0a0f] flex overflow-hidden">
-      {panes.map((pane, i) => (
-        <PaneWithDivider
-          key={pane.id}
-          pane={pane}
-          width={paneWidths[i]}
-          isLast={i === panes.length - 1}
-          showClose={panes.length > 1}
-          onClose={() => removePane(pane.id)}
-          onAdd={addPane}
-          onDividerDrag={(posPct) => {
-            setSplits((prev) => {
-              const next = [...prev];
-              next[i] = Math.max(10, Math.min(90, posPct));
-              return next;
-            });
-          }}
-        />
-      ))}
-    </div>
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <SortableContext items={panes.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
+        <div className="h-screen w-screen bg-[#0a0a0f] flex overflow-hidden">
+          {panes.map((pane, i) => (
+            <PaneWithDivider
+              key={pane.id}
+              pane={pane}
+              width={paneWidths[i]}
+              isLast={i === panes.length - 1}
+              showClose={panes.length > 1}
+              onClose={() => removePane(pane.id)}
+              onAdd={addPane}
+              onDividerDrag={(posPct) => {
+                setSplits((prev) => {
+                  const next = [...prev];
+                  next[i] = Math.max(10, Math.min(90, posPct));
+                  return next;
+                });
+              }}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
   );
 }
 
@@ -91,7 +132,23 @@ interface PaneWithDividerProps {
 
 function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
-  const onDragStart = useCallback(
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: pane.id });
+
+  const style: React.CSSProperties = {
+    width: `${width}%`,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const onDividerMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
 
@@ -111,7 +168,7 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
 
   return (
     <>
-      <div style={{ width: `${width}%` }} className="h-full min-w-0 relative">
+      <div ref={setNodeRef} style={style} className="h-full min-w-0 relative">
         {/* Toolbar */}
         <div className="absolute top-1 right-1 z-10 flex gap-1">
           <button
@@ -140,11 +197,15 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
             </button>
           )}
         </div>
-        <SessionPanel ref={sessionRef} sessionId={pane.sessionId} />
+        <SessionPanel
+          ref={sessionRef}
+          sessionId={pane.sessionId}
+          dragHandleProps={{ ...attributes, ...listeners }}
+        />
       </div>
       {!isLast && (
         <div
-          onMouseDown={onDragStart}
+          onMouseDown={onDividerMouseDown}
           className="w-1.5 bg-gray-800 hover:bg-blue-600 cursor-col-resize flex-shrink-0 transition-colors"
         />
       )}
