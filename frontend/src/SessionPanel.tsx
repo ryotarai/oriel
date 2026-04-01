@@ -59,6 +59,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
+  const programmaticScroll = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const swapEnterRef = useRef(swapEnterKeys ?? true);
@@ -270,6 +271,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     const el = chatScrollRef.current;
     if (!el) return;
     const handleScroll = () => {
+      if (programmaticScroll.current) return;
       const threshold = 80;
       isNearBottom.current =
         el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
@@ -281,7 +283,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   // Auto-scroll chat only when user is near the bottom
   useEffect(() => {
     if (isNearBottom.current) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      const el = chatScrollRef.current;
+      if (el) {
+        programmaticScroll.current = true;
+        el.scrollTop = el.scrollHeight;
+        requestAnimationFrame(() => {
+          programmaticScroll.current = false;
+        });
+      }
     }
   }, [entries]);
 
