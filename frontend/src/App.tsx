@@ -44,24 +44,42 @@ export default function App() {
     };
   }, []);
 
+  const prevBottomRef = useRef<Block[]>([]);
+
   const updateBlocks = useCallback(() => {
     const ht = hiddenTermRef.current;
     if (!ht) return;
     const lines = extractLines(ht.terminal.buffer.active as any);
-    const detected = detectBlocks(lines);
-    const bottomTypes = new Set(["input-prompt", "status-bar"]);
-    let splitIdx = detected.length;
-    for (let j = detected.length - 1; j >= 0; j--) {
-      if (bottomTypes.has(detected[j].type)) {
-        splitIdx = j;
-      } else if (detected[j].type === "separator" && j + 1 < detected.length && bottomTypes.has(detected[j + 1].type)) {
-        splitIdx = j;
-      } else {
+
+    // Split lines into main content and bottom input area.
+    // The bottom area in Claude Code's terminal is always the last few lines:
+    // separator (────) + input prompt (❯) + separator (────) + status bar (⏵⏵)
+    // We search from the end for the first separator that starts the bottom area.
+    let bottomStartLine = lines.length;
+    for (let j = lines.length - 1; j >= Math.max(0, lines.length - 8); j--) {
+      const text = lines[j].text.trim();
+      if (/^─+$/.test(text) && lines[j].spans.some(s => s.fg === 244)) {
+        bottomStartLine = j;
+      } else if (bottomStartLine < lines.length) {
         break;
       }
     }
-    setPtyBlocks(detected.slice(0, splitIdx));
-    setBottomBlocks(detected.slice(splitIdx));
+
+    const mainLines = lines.slice(0, bottomStartLine);
+    const bottomLines = lines.slice(bottomStartLine);
+
+    const detected = detectBlocks(mainLines);
+    const bottomDetected = detectBlocks(bottomLines);
+
+    setPtyBlocks(detected);
+
+    // Only update bottom blocks if we found a valid bottom area.
+    // During redraws the bottom may temporarily disappear — keep the previous one.
+    if (bottomDetected.length > 0) {
+      prevBottomRef.current = bottomDetected;
+      setBottomBlocks(bottomDetected);
+    }
+    // else: keep previous bottomBlocks unchanged
   }, []);
 
   const handleConversation = useCallback((entry: ConversationEntry) => {
