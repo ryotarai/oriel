@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+// MessageOrigin indicates where a JSONL entry originated.
+type MessageOrigin struct {
+	Kind string `json:"kind"`
+}
+
 // Message represents a parsed JSONL entry from Claude Code's conversation log.
 type Message struct {
 	Type      string          `json:"type"`
@@ -20,6 +25,7 @@ type Message struct {
 	Timestamp string          `json:"timestamp"`
 	Message   json.RawMessage `json:"message"`
 	IsMeta    bool            `json:"isMeta,omitempty"`
+	Origin    *MessageOrigin  `json:"origin,omitempty"`
 }
 
 // ContentBlock represents a content block within a message.
@@ -212,6 +218,9 @@ func parseLine(line []byte) []ConversationEntry {
 		return nil
 	}
 	if msg.IsMeta {
+		return nil
+	}
+	if msg.Origin != nil && msg.Origin.Kind == "task-notification" {
 		return nil
 	}
 
