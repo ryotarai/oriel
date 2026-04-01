@@ -82,7 +82,23 @@ export default function App() {
     setPanes((prev) => {
       const oldIndex = prev.findIndex((p) => p.id === active.id);
       const newIndex = prev.findIndex((p) => p.id === over.id);
-      return arrayMove(prev, oldIndex, newIndex);
+      const newPanes = arrayMove(prev, oldIndex, newIndex);
+
+      // Reorder widths to follow the panes
+      setSplits((prevSplits) => {
+        const oldWidths = computeWidths(prev.length, prevSplits);
+        const newWidths = arrayMove(oldWidths, oldIndex, newIndex);
+        // Convert widths back to split positions (cumulative sums)
+        const newSplits: number[] = [];
+        let cumulative = 0;
+        for (let i = 0; i < newWidths.length - 1; i++) {
+          cumulative += newWidths[i];
+          newSplits.push(cumulative);
+        }
+        return newSplits;
+      });
+
+      return newPanes;
     });
   }, []);
 
