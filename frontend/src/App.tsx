@@ -25,7 +25,7 @@ export default function App() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Split position: percentage of viewport height for chat panel
-  const [splitPct, setSplitPct] = useState(40);
+  const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
 
   const handleConversation = useCallback((entry: ConversationEntry) => {
