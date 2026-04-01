@@ -128,7 +128,7 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 
 	// If resuming a previous Claude session, pass --resume flag
 	var args []string
-	if resumeID != "" {
+	if resumeID != "" && conversation.SessionHasContent(cwd, resumeID) {
 		args = []string{"--resume", resumeID}
 		// Pre-load conversation history from the old session
 		oldEntries := conversation.ReadSessionEntries(cwd, resumeID)
@@ -196,7 +196,7 @@ func (h *Handler) restartLoop(s *session) {
 		h.broadcast(s, message{Type: "conversation_reset"})
 
 		// If resuming, load the old session's conversation entries
-		if req.resumeSessionID != "" {
+		if req.resumeSessionID != "" && conversation.SessionHasContent(cwd, req.resumeSessionID) {
 			oldEntries := conversation.ReadSessionEntries(cwd, req.resumeSessionID)
 			if len(oldEntries) > 0 {
 				s.mu.Lock()
@@ -214,7 +214,7 @@ func (h *Handler) restartLoop(s *session) {
 
 		// Start new process
 		var args []string
-		if req.resumeSessionID != "" {
+		if req.resumeSessionID != "" && conversation.SessionHasContent(cwd, req.resumeSessionID) {
 			args = []string{"--resume", req.resumeSessionID}
 		}
 		if err := h.startProcess(s, args...); err != nil {
@@ -306,8 +306,11 @@ func (h *Handler) watchConversation(s *session) {
 		s.mu.Lock()
 		s.claudeSessionID = uuid
 		s.mu.Unlock()
-		h.broadcast(s, message{Type: "claude_session_id", Data: uuid})
+		// Don't broadcast yet — wait until the session has conversation content
+		// so that empty sessions don't get a claudeSessionId saved to DB.
 	})
+
+	uuidBroadcast := false
 
 	for {
 		select {
@@ -330,6 +333,17 @@ func (h *Handler) watchConversation(s *session) {
 			s.convHistory = append(s.convHistory, entry)
 			s.mu.Unlock()
 			h.broadcast(s, message{Type: "conversation", Entry: entryJSON})
+
+			// After first real conversation entry, broadcast the UUID
+			if !uuidBroadcast {
+				s.mu.Lock()
+				uuid := s.claudeSessionID
+				s.mu.Unlock()
+				if uuid != "" {
+					h.broadcast(s, message{Type: "claude_session_id", Data: uuid})
+					uuidBroadcast = true
+				}
+			}
 		case <-done:
 			return
 		}
