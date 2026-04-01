@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -92,6 +93,13 @@ func readSessionMeta(pid int) (*sessionMeta, error) {
 		return nil, err
 	}
 	return &meta, nil
+}
+
+// ReadSessionEntries reads all conversation entries from a specific session's JSONL file.
+func ReadSessionEntries(cwd, sessionID string) []ConversationEntry {
+	projDir := projectDir(cwd)
+	jsonlPath := filepath.Join(projDir, sessionID+".jsonl")
+	return readAllEntries(jsonlPath)
 }
 
 // WatchSession discovers the session JSONL from the child PID, reads existing
@@ -221,7 +229,7 @@ func parseLine(line []byte) []ConversationEntry {
 		return nil
 	}
 	if msg.Origin != nil && msg.Origin.Kind == "task-notification" {
-		return nil
+		return parseTaskNotification(msg)
 	}
 
 	var parsed ParsedMessage
@@ -316,6 +324,51 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 		}
 	}
 	return entries
+}
+
+var (
+	taskStatusRe  = regexp.MustCompile(`<status>(.*?)</status>`)
+	taskSummaryRe = regexp.MustCompile(`<summary>(.*?)</summary>`)
+	taskResultRe  = regexp.MustCompile(`(?s)<result>(.*?)</result>`)
+)
+
+func parseTaskNotification(msg Message) []ConversationEntry {
+	var parsed ParsedMessage
+	if err := json.Unmarshal(msg.Message, &parsed); err != nil {
+		return nil
+	}
+
+	// Content is a string containing XML
+	var content string
+	if err := json.Unmarshal(parsed.Content, &content); err != nil {
+		return nil
+	}
+
+	statusMatch := taskStatusRe.FindStringSubmatch(content)
+	if len(statusMatch) < 2 || statusMatch[1] != "completed" {
+		return nil
+	}
+
+	summaryMatch := taskSummaryRe.FindStringSubmatch(content)
+	resultMatch := taskResultRe.FindStringSubmatch(content)
+
+	var text string
+	if len(summaryMatch) >= 2 {
+		text = "**" + summaryMatch[1] + "**\n\n"
+	}
+	if len(resultMatch) >= 2 {
+		text += strings.TrimSpace(resultMatch[1])
+	}
+	if text == "" {
+		return nil
+	}
+
+	return []ConversationEntry{{
+		Type: "assistant",
+		Role: "assistant",
+		UUID: msg.UUID,
+		Text: text,
+	}}
 }
 
 func extractToolResultText(content json.RawMessage) string {

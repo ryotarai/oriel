@@ -155,8 +155,26 @@ func (h *Handler) restartLoop(s *session) {
 		// Clear conversation history and notify frontend
 		s.mu.Lock()
 		s.convHistory = nil
+		cwd := s.cwd
 		s.mu.Unlock()
 		h.broadcast(s, message{Type: "conversation_reset"})
+
+		// If resuming, load the old session's conversation entries
+		if req.resumeSessionID != "" {
+			oldEntries := conversation.ReadSessionEntries(cwd, req.resumeSessionID)
+			if len(oldEntries) > 0 {
+				s.mu.Lock()
+				s.convHistory = append(s.convHistory, oldEntries...)
+				s.mu.Unlock()
+				for _, entry := range oldEntries {
+					entryJSON, err := json.Marshal(entry)
+					if err != nil {
+						continue
+					}
+					h.broadcast(s, message{Type: "conversation", Entry: entryJSON})
+				}
+			}
+		}
 
 		// Start new process
 		var args []string

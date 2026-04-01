@@ -133,6 +133,8 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     // Plain Enter → Ctrl+J (newline) only when Claude's input prompt (❯) is active
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
+      // Don't intercept IME composition events (e.g. Japanese input confirm)
+      if (e.isComposing || e.keyCode === 229) return true;
       if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
         // Scan visible buffer for Claude's ❯ prompt
         const buf = term.buffer.active;
