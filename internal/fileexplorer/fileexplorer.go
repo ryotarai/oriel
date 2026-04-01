@@ -52,6 +52,14 @@ func HandleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data, err := os.ReadFile(absPath)
+	if err != nil && os.IsNotExist(err) {
+		// File not found — search subdirectories for a matching basename
+		if found := findFileByName(root, filepath.Base(relPath)); found != "" {
+			absPath = filepath.Join(root, found)
+			relPath = found
+			data, err = os.ReadFile(absPath)
+		}
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -141,6 +149,31 @@ func buildTree(root, dir string, maxDepth int) *TreeNode {
 	}
 
 	return node
+}
+
+// findFileByName walks the directory tree looking for a file with the given
+// base name, skipping the same directories as buildTree. Returns the first
+// match as a path relative to root, or "" if none found.
+func findFileByName(root, name string) string {
+	var result string
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if shouldSkip(d.Name(), d.Type()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() == name {
+			rel, _ := filepath.Rel(root, path)
+			result = rel
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return result
 }
 
 func shouldSkip(name string, mode fs.FileMode) bool {

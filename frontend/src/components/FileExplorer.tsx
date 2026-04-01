@@ -33,8 +33,15 @@ export function FileExplorer({ requestedPath }: { requestedPath?: string | null 
     setSelectedPath(path);
     setLoading(true);
     fetch(`/api/files/read?path=${encodeURIComponent(path)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("not found");
+        return r.json();
+      })
       .then((data) => {
+        // Backend may resolve the path to a subdirectory match
+        if (data.path && data.path !== path) {
+          setSelectedPath(data.path);
+        }
         setFileContent(data.content);
         setIsBinary(data.isBinary ?? false);
         setLoading(false);
