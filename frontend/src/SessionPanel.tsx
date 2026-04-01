@@ -47,10 +47,11 @@ interface SessionPanelProps {
   swapEnterKeys?: boolean;
   cwd?: string;
   onCwdChange?: (newCwd: string) => void;
-  resume?: boolean;
+  resumeSessionId?: string; // real Claude CLI session UUID for --resume
+  onClaudeSessionId?: (uuid: string) => void;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, cwd, onCwdChange, resume }, ref) {
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, cwd, onCwdChange, resumeSessionId, onClaudeSessionId }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -69,6 +70,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
   const onCwdChangeRef = useRef(onCwdChange);
   onCwdChangeRef.current = onCwdChange;
+
+  const onClaudeSessionIdRef = useRef(onClaudeSessionId);
+  onClaudeSessionIdRef.current = onClaudeSessionId;
 
   const prevCwdRef = useRef(cwd);
   useEffect(() => {
@@ -190,7 +194,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     fitRef.current = fit;
 
     const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
-    const resumeParam = resume ? `&resume=${encodeURIComponent(sessionId)}` : "";
+    const resumeParam = resumeSessionId ? `&resume=${encodeURIComponent(resumeSessionId)}` : "";
     const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}${cwdParam}${resumeParam}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -214,6 +218,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         setWorktreeDir(msg.data);
       } else if (msg.type === "cwd" && msg.data) {
         onCwdChangeRef.current?.(msg.data);
+      } else if (msg.type === "claude_session_id" && msg.data) {
+        onClaudeSessionIdRef.current?.(msg.data);
       } else if (msg.type === "conversation" && msg.entry) {
         const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
         handleConversation(entry);

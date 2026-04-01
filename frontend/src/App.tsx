@@ -20,6 +20,7 @@ import { SessionPanel, type SessionPanelHandle } from "./SessionPanel";
 interface PaneConfig {
   id: string;
   sessionId: string;
+  claudeSessionId: string; // real Claude CLI session UUID (for --resume)
   cwd: string; // empty = process cwd
 }
 
@@ -31,18 +32,24 @@ interface TabConfig {
   activePaneIndex: number;
 }
 
-let tabCounter = 1;
-
 function makeTab(name: string, cwd: string): TabConfig {
-  const id = `tab-${Date.now()}-${tabCounter}`;
-  tabCounter++;
+  const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return {
     id,
     name,
-    panes: [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, cwd }],
+    panes: [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, claudeSessionId: "", cwd }],
     splits: [],
     activePaneIndex: 0,
   };
+}
+
+function nextTabName(tabs: TabConfig[]): string {
+  let max = 0;
+  for (const t of tabs) {
+    const n = parseInt(t.name.replace("Tab ", ""), 10);
+    if (!isNaN(n) && n > max) max = n;
+  }
+  return `Tab ${max + 1}`;
 }
 
 export default function App() {
@@ -52,7 +59,6 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean }>({ swapEnterKeys: true });
   const paneRefs = useRef<Map<string, SessionPanelHandle>>(new Map());
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const [restoredSessionIds] = useState<Set<string>>(new Set());
 
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
 
@@ -60,7 +66,7 @@ export default function App() {
   useEffect(() => {
     fetch("/api/state")
       .then((r) => r.json())
-      .then((data: { tabs: Array<{ id: string; name: string; position: number }>; panes: Array<{ id: string; tabId: string; sessionId: string; cwd: string; worktreeDir: string; position: number }> }) => {
+      .then((data: { tabs: Array<{ id: string; name: string; position: number }>; panes: Array<{ id: string; tabId: string; sessionId: string; claudeSessionId: string; cwd: string; worktreeDir: string; position: number }> }) => {
         if (data.tabs && data.tabs.length > 0) {
           const loadedTabs: TabConfig[] = data.tabs
             .sort((a, b) => a.position - b.position)
@@ -68,21 +74,17 @@ export default function App() {
               const tabPanes = data.panes
                 .filter((p) => p.tabId === t.id)
                 .sort((a, b) => a.position - b.position)
-                .map((p) => ({ id: p.id, sessionId: p.sessionId, cwd: p.cwd }));
-              // Update tabCounter to avoid collisions
-              const num = parseInt(t.name.replace("Tab ", ""), 10);
-              if (!isNaN(num) && num >= tabCounter) tabCounter = num + 1;
+                .map((p) => ({ id: p.id, sessionId: p.sessionId, claudeSessionId: p.claudeSessionId || "", cwd: p.cwd }));
               return {
                 id: t.id,
                 name: t.name,
-                panes: tabPanes.length > 0 ? tabPanes : [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, cwd: "" }],
+                panes: tabPanes.length > 0 ? tabPanes : [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, claudeSessionId: "", cwd: "" }],
                 splits: [],
                 activePaneIndex: 0,
               };
             });
           setTabs(loadedTabs);
           setActiveTabId(loadedTabs[0].id);
-          loadedTabs.forEach((t) => t.panes.forEach((p) => restoredSessionIds.add(p.sessionId)));
         }
         setInitialLoadDone(true);
       })
@@ -97,6 +99,7 @@ export default function App() {
         id: p.id,
         tabId: t.id,
         sessionId: p.sessionId,
+        claudeSessionId: p.claudeSessionId,
         cwd: p.cwd,
         worktreeDir: "",
         position: i,
@@ -152,7 +155,7 @@ export default function App() {
       const newId = `pane-${Date.now()}`;
       const newSessionId = `session-${Date.now()}`;
       const next = [...tab.panes];
-      next.splice(afterIndex + 1, 0, { id: newId, sessionId: newSessionId, cwd: sourceCwd });
+      next.splice(afterIndex + 1, 0, { id: newId, sessionId: newSessionId, claudeSessionId: "", cwd: sourceCwd });
       const positions: number[] = [];
       for (let i = 1; i < next.length; i++) {
         positions.push((i / next.length) * 100);
@@ -208,9 +211,11 @@ export default function App() {
 
   // Tab management
   const addTab = useCallback(() => {
-    const newTab = makeTab(`Tab ${tabCounter}`, "");
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(newTab.id);
+    setTabs((prev) => {
+      const newTab = makeTab(nextTabName(prev), "");
+      setActiveTabId(newTab.id);
+      return [...prev, newTab];
+    });
   }, []);
 
   const deleteTab = useCallback((id: string) => {
@@ -228,62 +233,75 @@ export default function App() {
     setTabs((prev) => prev.map((t) => t.id === id ? { ...t, name } : t));
   }, []);
 
-  const paneWidths = computeWidths(activeTab.panes.length, activeTab.splits);
-
   return (
     <div className="h-screen w-screen bg-[#0a0a0f] flex flex-col overflow-hidden">
-      {/* Main pane area */}
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <SortableContext items={activeTab.panes.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
-          <div className="flex-1 flex overflow-hidden relative min-h-0">
-            {/* Settings button */}
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="fixed bottom-10 right-2 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
-              title="Settings"
-            >
-              ⚙
-            </button>
-            {showSettings && (
-              <div className="absolute inset-0 z-30 bg-black/70 flex items-start justify-center pt-16">
-                <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-                    <h2 className="text-gray-100 font-medium">Settings</h2>
-                    <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
-                  </div>
-                  <SettingsPage />
-                </div>
-              </div>
-            )}
-            {activeTab.panes.map((pane, i) => (
-              <PaneWithDivider
-                key={pane.id}
-                pane={pane}
-                width={paneWidths[i]}
-                isLast={i === activeTab.panes.length - 1}
-                showClose={activeTab.panes.length > 1}
-                onClose={() => removePane(pane.id)}
-                onAdd={() => addPaneAt(i)}
-                onDividerDrag={(posPct) => {
-                  updateActiveTab((tab) => {
-                    const next = [...tab.splits];
-                    next[i] = Math.max(10, Math.min(90, posPct));
-                    return { ...tab, splits: next };
-                  });
-                }}
-                swapEnterKeys={appConfig.swapEnterKeys}
-                onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
-                resume={restoredSessionIds.has(pane.sessionId)}
-                onRef={(handle) => {
-                  if (handle) paneRefs.current.set(pane.id, handle);
-                  else paneRefs.current.delete(pane.id);
-                }}
-                onFocus={() => updateActiveTab((tab) => ({ ...tab, activePaneIndex: i }))}
-              />
-            ))}
+      {/* Main pane area — render ALL tabs, hide inactive ones to preserve xterm state */}
+      {/* Settings button */}
+      <button
+        onClick={() => setShowSettings(!showSettings)}
+        className="fixed bottom-10 right-2 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
+        title="Settings"
+      >
+        ⚙
+      </button>
+      {showSettings && (
+        <div className="absolute inset-0 z-30 bg-black/70 flex items-start justify-center pt-16">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <h2 className="text-gray-100 font-medium">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
+            </div>
+            <SettingsPage />
           </div>
-        </SortableContext>
-      </DndContext>
+        </div>
+      )}
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeTabId;
+        const tabPaneWidths = computeWidths(tab.panes.length, tab.splits);
+        return (
+          <DndContext key={tab.id} sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext items={tab.panes.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
+              <div
+                className="flex-1 flex overflow-hidden relative min-h-0"
+                style={isActive ? undefined : { display: "none" }}
+              >
+                {tab.panes.map((pane, i) => (
+                  <PaneWithDivider
+                    key={pane.id}
+                    pane={pane}
+                    width={tabPaneWidths[i]}
+                    isLast={i === tab.panes.length - 1}
+                    showClose={tab.panes.length > 1}
+                    onClose={() => removePane(pane.id)}
+                    onAdd={() => addPaneAt(i)}
+                    onDividerDrag={(posPct) => {
+                      updateActiveTab((tab) => {
+                        const next = [...tab.splits];
+                        next[i] = Math.max(10, Math.min(90, posPct));
+                        return { ...tab, splits: next };
+                      });
+                    }}
+                    swapEnterKeys={appConfig.swapEnterKeys}
+                    onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
+                    resumeSessionId={pane.claudeSessionId || undefined}
+                    onClaudeSessionId={(uuid) => {
+                      setTabs((prev) => prev.map((tt) => ({
+                        ...tt,
+                        panes: tt.panes.map((pp) => pp.id === pane.id ? { ...pp, claudeSessionId: uuid } : pp),
+                      })));
+                    }}
+                    onRef={(handle) => {
+                      if (handle) paneRefs.current.set(pane.id, handle);
+                      else paneRefs.current.delete(pane.id);
+                    }}
+                    onFocus={() => updateActiveTab((tab) => ({ ...tab, activePaneIndex: i }))}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        );
+      })}
 
       {/* Bottom tab bar */}
       <BottomTabBar
@@ -320,10 +338,11 @@ interface PaneWithDividerProps {
   onCwdChange: (newCwd: string) => void;
   onRef: (handle: SessionPanelHandle | null) => void;
   onFocus: () => void;
-  resume?: boolean;
+  resumeSessionId?: string;
+  onClaudeSessionId?: (uuid: string) => void;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange, onRef, onFocus, resume }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange, onRef, onFocus, resumeSessionId, onClaudeSessionId }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
   const paneContainerRef = useRef<HTMLDivElement>(null);
   const {
@@ -420,7 +439,8 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           swapEnterKeys={swapEnterKeys}
           cwd={pane.cwd}
           onCwdChange={onCwdChange}
-          resume={resume}
+          resumeSessionId={resumeSessionId}
+          onClaudeSessionId={onClaudeSessionId}
         />
       </div>
       {!isLast && (

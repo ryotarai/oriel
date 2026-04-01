@@ -95,6 +95,24 @@ func readSessionMeta(pid int) (*sessionMeta, error) {
 	return &meta, nil
 }
 
+// DiscoverSessionID polls ~/.claude/sessions/<pid>.json until the Claude CLI
+// session UUID is available, then returns it.  Returns "" if done closes first.
+func DiscoverSessionID(childPID int, done <-chan struct{}) string {
+	for {
+		select {
+		case <-done:
+			return ""
+		default:
+		}
+		meta, err := readSessionMeta(childPID)
+		if err != nil {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		return meta.SessionID
+	}
+}
+
 // ReadSessionEntries reads all conversation entries from a specific session's JSONL file.
 func ReadSessionEntries(cwd, sessionID string) []ConversationEntry {
 	projDir := projectDir(cwd)

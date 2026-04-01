@@ -59,6 +59,9 @@ type session struct {
 	// Worktree directory (set when Claude enters a git worktree); used for diff/files/commits
 	worktreeDir string
 
+	// The real Claude CLI session UUID (discovered from ~/.claude/sessions/<pid>.json)
+	claudeSessionID string
+
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
 }
@@ -134,11 +137,31 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 		return nil, err
 	}
 
+	// Discover the real Claude CLI session UUID and broadcast it to clients
+	go h.discoverClaudeSessionID(s)
+
 	// Restart loop: when readPtyLoop detects /clear or /resume, it sends a
 	// restartRequest. This goroutine handles the restart.
 	go h.restartLoop(s)
 
 	return s, nil
+}
+
+func (h *Handler) discoverClaudeSessionID(s *session) {
+	s.mu.Lock()
+	done := s.pty.Done()
+	s.mu.Unlock()
+
+	pid := s.pty.Pid()
+	uuid := conversation.DiscoverSessionID(pid, done)
+	if uuid == "" {
+		return
+	}
+	log.Printf("Session %s: discovered Claude session UUID %s", s.id, uuid)
+	s.mu.Lock()
+	s.claudeSessionID = uuid
+	s.mu.Unlock()
+	h.broadcast(s, message{Type: "claude_session_id", Data: uuid})
 }
 
 func (h *Handler) startProcess(s *session, args ...string) error {
@@ -401,12 +424,13 @@ func (h *Handler) HandleSaveState(w http.ResponseWriter, r *http.Request) {
 			Position int    `json:"position"`
 		} `json:"tabs"`
 		Panes []struct {
-			ID          string `json:"id"`
-			TabID       string `json:"tabId"`
-			SessionID   string `json:"sessionId"`
-			Cwd         string `json:"cwd"`
-			WorktreeDir string `json:"worktreeDir"`
-			Position    int    `json:"position"`
+			ID              string `json:"id"`
+			TabID           string `json:"tabId"`
+			SessionID       string `json:"sessionId"`
+			ClaudeSessionID string `json:"claudeSessionId"`
+			Cwd             string `json:"cwd"`
+			WorktreeDir     string `json:"worktreeDir"`
+			Position        int    `json:"position"`
 		} `json:"panes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -422,6 +446,7 @@ func (h *Handler) HandleSaveState(w http.ResponseWriter, r *http.Request) {
 	for i, p := range payload.Panes {
 		panes[i] = state.Pane{
 			ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
+			ClaudeSessionID: p.ClaudeSessionID,
 			Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 		}
 	}
@@ -448,12 +473,13 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type paneJSON struct {
-		ID          string `json:"id"`
-		TabID       string `json:"tabId"`
-		SessionID   string `json:"sessionId"`
-		Cwd         string `json:"cwd"`
-		WorktreeDir string `json:"worktreeDir"`
-		Position    int    `json:"position"`
+		ID              string `json:"id"`
+		TabID           string `json:"tabId"`
+		SessionID       string `json:"sessionId"`
+		ClaudeSessionID string `json:"claudeSessionId"`
+		Cwd             string `json:"cwd"`
+		WorktreeDir     string `json:"worktreeDir"`
+		Position        int    `json:"position"`
 	}
 	type tabJSON struct {
 		ID       string `json:"id"`
@@ -474,6 +500,7 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 		for _, p := range panes {
 			respPanes = append(respPanes, paneJSON{
 				ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
+				ClaudeSessionID: p.ClaudeSessionID,
 				Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 			})
 		}

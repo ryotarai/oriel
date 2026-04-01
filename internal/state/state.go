@@ -16,12 +16,13 @@ type Tab struct {
 }
 
 type Pane struct {
-	ID          string
-	TabID       string
-	SessionID   string
-	Cwd         string
-	WorktreeDir string
-	Position    int
+	ID               string
+	TabID            string
+	SessionID        string
+	ClaudeSessionID  string
+	Cwd              string
+	WorktreeDir      string
+	Position         int
 }
 
 type Store struct {
@@ -82,15 +83,21 @@ func (s *Store) migrate() error {
 			position  INTEGER NOT NULL
 		);
 		CREATE TABLE IF NOT EXISTS panes (
-			id           TEXT PRIMARY KEY,
-			tab_id       TEXT NOT NULL REFERENCES tabs(id) ON DELETE CASCADE,
-			session_id   TEXT NOT NULL,
-			cwd          TEXT NOT NULL,
-			worktree_dir TEXT NOT NULL DEFAULT '',
-			position     INTEGER NOT NULL
+			id                TEXT PRIMARY KEY,
+			tab_id            TEXT NOT NULL REFERENCES tabs(id) ON DELETE CASCADE,
+			session_id        TEXT NOT NULL,
+			claude_session_id TEXT NOT NULL DEFAULT '',
+			cwd               TEXT NOT NULL,
+			worktree_dir      TEXT NOT NULL DEFAULT '',
+			position          INTEGER NOT NULL
 		);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Migration: add claude_session_id column if missing (existing DBs)
+	s.db.Exec("ALTER TABLE panes ADD COLUMN claude_session_id TEXT NOT NULL DEFAULT ''")
+	return nil
 }
 
 // GetAuthToken returns the stored auth token, or empty string if none.
@@ -133,7 +140,7 @@ func (s *Store) ListTabs() ([]Tab, error) {
 
 // ListPanes returns all panes for a tab ordered by position.
 func (s *Store) ListPanes(tabID string) ([]Pane, error) {
-	rows, err := s.db.Query("SELECT id, tab_id, session_id, cwd, worktree_dir, position FROM panes WHERE tab_id = ? ORDER BY position", tabID)
+	rows, err := s.db.Query("SELECT id, tab_id, session_id, claude_session_id, cwd, worktree_dir, position FROM panes WHERE tab_id = ? ORDER BY position", tabID)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +149,7 @@ func (s *Store) ListPanes(tabID string) ([]Pane, error) {
 	var panes []Pane
 	for rows.Next() {
 		var p Pane
-		if err := rows.Scan(&p.ID, &p.TabID, &p.SessionID, &p.Cwd, &p.WorktreeDir, &p.Position); err != nil {
+		if err := rows.Scan(&p.ID, &p.TabID, &p.SessionID, &p.ClaudeSessionID, &p.Cwd, &p.WorktreeDir, &p.Position); err != nil {
 			return nil, err
 		}
 		panes = append(panes, p)
@@ -171,8 +178,8 @@ func (s *Store) SaveFullState(tabs []Tab, panes []Pane) error {
 		}
 	}
 	for _, p := range panes {
-		if _, err := tx.Exec("INSERT INTO panes (id, tab_id, session_id, cwd, worktree_dir, position) VALUES (?, ?, ?, ?, ?, ?)",
-			p.ID, p.TabID, p.SessionID, p.Cwd, p.WorktreeDir, p.Position); err != nil {
+		if _, err := tx.Exec("INSERT INTO panes (id, tab_id, session_id, claude_session_id, cwd, worktree_dir, position) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			p.ID, p.TabID, p.SessionID, p.ClaudeSessionID, p.Cwd, p.WorktreeDir, p.Position); err != nil {
 			return err
 		}
 	}
