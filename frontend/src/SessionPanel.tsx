@@ -375,7 +375,19 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   Messages will appear here...
                 </div>
               )}
-              {entries.filter((entry) => showTools || (entry.type !== "tool_use" && entry.type !== "tool_result")).map((entry) => (
+              {entries.filter((entry) => {
+                if (!showTools && (entry.type === "tool_use" || entry.type === "tool_result")) return false;
+                // Hide tool results for Edit and Write tools
+                if (entry.type === "tool_result") {
+                  const matchingUse = entries.find(
+                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
+                  );
+                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write")) {
+                    return false;
+                  }
+                }
+                return true;
+              }).map((entry) => (
                 <MessageBubble key={entry.uuid} entry={entry} onOpenFile={openFileInExplorer} />
               ))}
               <div ref={chatEndRef} />
@@ -592,6 +604,14 @@ function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const summary = toolUseSummary(entry.toolName ?? "", entry.toolInput ?? "");
 
+  let parsedInput: Record<string, unknown> | null = null;
+  try {
+    parsedInput = JSON.parse(entry.toolInput ?? "{}");
+  } catch {}
+
+  const isWrite = entry.toolName === "Write";
+  const isEdit = entry.toolName === "Edit";
+
   return (
     <div className="my-1">
       <button
@@ -604,12 +624,47 @@ function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
           <span className="text-gray-400 truncate">{summary}</span>
         </div>
       </button>
-      {expanded && entry.toolInput && (
+      {expanded && isWrite && parsedInput?.content != null && (
+        <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 overflow-hidden">
+          <pre className="px-3 py-2 text-xs font-mono text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">
+            {String(parsedInput.content)}
+          </pre>
+        </div>
+      )}
+      {expanded && isEdit && parsedInput && (
+        <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 overflow-hidden">
+          <EditDiff
+            oldStr={String(parsedInput.old_string ?? "")}
+            newStr={String(parsedInput.new_string ?? "")}
+          />
+        </div>
+      )}
+      {expanded && !isWrite && !isEdit && entry.toolInput && (
         <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 px-3 py-2 text-xs font-mono text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">
           {formatToolInput(entry.toolInput)}
         </div>
       )}
     </div>
+  );
+}
+
+function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
+  const oldLines = oldStr.split("\n");
+  const newLines = newStr.split("\n");
+
+  return (
+    <pre className="px-3 py-2 text-xs font-mono max-h-60 overflow-y-auto">
+      {oldLines.map((line, i) => (
+        <div key={`old-${i}`} className="text-red-300 bg-red-900/20">
+          <span className="select-none text-red-500 mr-1">-</span>{line || "\u00a0"}
+        </div>
+      ))}
+      {newLines.map((line, i) => (
+        <div key={`new-${i}`} className="text-green-300 bg-green-900/20">
+          <span className="select-none text-green-500 mr-1">+</span>{line || "\u00a0"}
+        </div>
+      ))}
+    </pre>
   );
 }
 
