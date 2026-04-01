@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { abbreviateHome } from "../utils/paths";
+import { useResizableSplit } from "../hooks/useResizableSplit";
 
 interface CommitSummary {
   hash: string;
@@ -20,6 +21,7 @@ export function CommitsPanel({ cwd }: { cwd?: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<CommitDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const { leftWidth, containerRef: splitContainerRef, onMouseDown: onSplitMouseDown } = useResizableSplit({ defaultWidth: 288 });
 
   useEffect(() => {
     const cwdParam = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
@@ -48,9 +50,9 @@ export function CommitsPanel({ cwd }: { cwd?: string }) {
           </span>
         </div>
       )}
-      <div className="flex flex-1 min-h-0">
+      <div ref={splitContainerRef} className="flex flex-1 min-h-0">
       {/* Commit list (left) */}
-      <div className="w-72 flex-shrink-0 border-r border-gray-800 overflow-y-auto">
+      <div className="flex-shrink-0 border-r border-gray-800 overflow-y-auto" style={{ width: leftWidth }}>
         {commits.map((c) => (
           <button
             key={c.hash}
@@ -70,6 +72,12 @@ export function CommitsPanel({ cwd }: { cwd?: string }) {
           <div className="text-gray-500 text-xs p-3 text-center">No commits</div>
         )}
       </div>
+
+      {/* Resize handle */}
+      <div
+        onMouseDown={onSplitMouseDown}
+        className="w-1 flex-shrink-0 cursor-col-resize hover:bg-blue-600 transition-colors"
+      />
 
       {/* Commit detail (right) */}
       <div className="flex-1 overflow-y-auto">

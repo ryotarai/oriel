@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import hljs from "highlight.js";
 import { abbreviateHome } from "../utils/paths";
+import { useResizableSplit } from "../hooks/useResizableSplit";
 
 interface TreeNode {
   name: string;
@@ -16,6 +17,7 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
   const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
   const [wrapLines, setWrapLines] = useState(true);
+  const { leftWidth, containerRef: splitContainerRef, onMouseDown: onSplitMouseDown } = useResizableSplit({ defaultWidth: 256 });
 
   useEffect(() => {
     const poll = () => {
@@ -79,9 +81,9 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
           </span>
         )}
       </div>
-      <div className="flex flex-1 min-h-0">
+      <div ref={splitContainerRef} className="flex flex-1 min-h-0">
         {/* File tree (left pane) */}
-        <div className="w-64 flex-shrink-0 border-r border-gray-700 overflow-y-auto text-sm">
+        <div className="flex-shrink-0 border-r border-gray-700 overflow-y-auto text-sm" style={{ width: leftWidth }}>
           {tree ? (
             <div className="py-1">
               {tree.children?.map((node) => (
@@ -98,6 +100,12 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
             <div className="text-gray-500 text-xs p-3">Loading...</div>
           )}
         </div>
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={onSplitMouseDown}
+          className="w-1 flex-shrink-0 cursor-col-resize hover:bg-blue-600 transition-colors"
+        />
 
         {/* File viewer (right pane) */}
         <div className="flex-1 overflow-auto min-w-0">

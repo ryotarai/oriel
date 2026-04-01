@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState } from "react";
 import { abbreviateHome } from "../utils/paths";
+import { useResizableSplit } from "../hooks/useResizableSplit";
 
 export interface FileDiffData {
   path: string;
@@ -35,6 +36,7 @@ export function DiffPanel({ files, onSendInput, cwd }: DiffPanelProps) {
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [wrapLines, setWrapLines] = useState(true);
+  const { leftWidth, containerRef: splitContainerRef, onMouseDown: onSplitMouseDown } = useResizableSplit({ defaultWidth: 240 });
 
   const scrollToFile = useCallback((path: string) => {
     const el = sectionRefs.current.get(path);
@@ -72,9 +74,9 @@ export function DiffPanel({ files, onSendInput, cwd }: DiffPanelProps) {
           </span>
         )}
       </div>
-      <div className="flex flex-1 min-h-0">
+      <div ref={splitContainerRef} className="flex flex-1 min-h-0">
         {/* File tree (left) */}
-        <div className="w-60 flex-shrink-0 border-r border-gray-800 overflow-y-auto">
+        <div className="flex-shrink-0 border-r border-gray-800 overflow-y-auto" style={{ width: leftWidth }}>
           {files.map((f) => (
             <button
               key={f.path}
@@ -93,6 +95,12 @@ export function DiffPanel({ files, onSendInput, cwd }: DiffPanelProps) {
             </button>
           ))}
         </div>
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={onSplitMouseDown}
+          className="w-1 flex-shrink-0 cursor-col-resize hover:bg-blue-600 transition-colors"
+        />
 
         {/* Diff sections (right) */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
