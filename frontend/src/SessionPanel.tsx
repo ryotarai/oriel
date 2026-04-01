@@ -37,15 +37,18 @@ interface SessionSummary {
 
 export interface SessionPanelHandle {
   openResumeModal: () => void;
+  openCwdPicker: () => void;
 }
 
 interface SessionPanelProps {
   sessionId: string;
   dragHandleProps?: Record<string, unknown>;
   swapEnterKeys?: boolean;
+  cwd?: string;
+  onCwdChange?: (newCwd: string) => void;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys }, ref) {
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, cwd, onCwdChange }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -60,6 +63,18 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
   const swapEnterRef = useRef(swapEnterKeys ?? true);
   useEffect(() => { swapEnterRef.current = swapEnterKeys ?? true; }, [swapEnterKeys]);
+
+  const prevCwdRef = useRef(cwd);
+  useEffect(() => {
+    if (prevCwdRef.current !== cwd && cwd && prevCwdRef.current !== undefined) {
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "set_cwd", data: cwd }));
+      }
+    }
+    prevCwdRef.current = cwd;
+    setCwdInput(cwd ?? "");
+  }, [cwd]);
 
   const [splitPct, setSplitPct] = useState(70);
   const dragging = useRef(false);
@@ -88,6 +103,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [sessionList, setSessionList] = useState<SessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+
+  // CWD picker
+  const [showCwdPicker, setShowCwdPicker] = useState(false);
+  const [cwdInput, setCwdInput] = useState(cwd ?? "");
 
   const handleConversation = useCallback((entry: ConversationEntry) => {
     if (seenUUIDs.current.has(entry.uuid)) return;
@@ -119,6 +138,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
   useImperativeHandle(ref, () => ({
     openResumeModal,
+    openCwdPicker: () => setShowCwdPicker(true),
   }), [openResumeModal]);
 
   useEffect(() => {
@@ -140,7 +160,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     termRef.current = term;
     fitRef.current = fit;
 
-    const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}`;
+    const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
+    const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}${cwdParam}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -481,7 +502,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={cwd} />
           </div>
         )}
       </div>
@@ -505,6 +526,50 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           onSelect={sendResume}
           onClose={() => setShowResumeModal(false)}
         />
+      )}
+
+      {/* CWD picker modal */}
+      {showCwdPicker && (
+        <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-md p-4">
+            <h3 className="text-gray-100 text-sm font-medium mb-3">Change Working Directory</h3>
+            <p className="text-yellow-400 text-xs mb-3">This will restart the Claude Code session.</p>
+            <input
+              type="text"
+              value={cwdInput}
+              onChange={(e) => setCwdInput(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-600 text-gray-200 text-sm px-3 py-1.5 rounded font-mono"
+              placeholder="/path/to/directory"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && cwdInput.trim()) {
+                  onCwdChange?.(cwdInput.trim());
+                  setShowCwdPicker(false);
+                }
+                if (e.key === "Escape") setShowCwdPicker(false);
+              }}
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setShowCwdPicker(false)}
+                className="text-gray-400 text-xs px-3 py-1 rounded hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (cwdInput.trim()) {
+                    onCwdChange?.(cwdInput.trim());
+                    setShowCwdPicker(false);
+                  }
+                }}
+                className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-500"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

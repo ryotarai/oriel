@@ -19,10 +19,14 @@ type TreeNode struct {
 
 // HandleTree returns the directory tree as JSON rooted at the working directory.
 func HandleTree(w http.ResponseWriter, r *http.Request) {
-	root, err := os.Getwd()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	root := r.URL.Query().Get("cwd")
+	if root == "" {
+		var err error
+		root, err = os.Getwd()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	tree := buildTree(root, root, 4)
@@ -38,10 +42,14 @@ func HandleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	root, err := os.Getwd()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	root := r.URL.Query().Get("cwd")
+	if root == "" {
+		var err error
+		root, err = os.Getwd()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	absPath := filepath.Join(root, filepath.Clean(relPath))

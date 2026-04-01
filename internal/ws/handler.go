@@ -88,7 +88,7 @@ func NewHandler(command string) *Handler {
 	}
 }
 
-func (h *Handler) getOrCreateSession(id string) (*session, error) {
+func (h *Handler) getOrCreateSession(id string, cwd string) (*session, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -96,11 +96,16 @@ func (h *Handler) getOrCreateSession(id string) (*session, error) {
 		return s, nil
 	}
 
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+
 	s := &session{
 		id:        id,
 		subs:      make(map[*subscriber]struct{}),
 		cols:      120,
 		rows:      40,
+		cwd:       cwd,
 		restartCh: make(chan restartRequest, 1),
 	}
 	h.sessions[id] = s
@@ -118,18 +123,18 @@ func (h *Handler) getOrCreateSession(id string) (*session, error) {
 }
 
 func (h *Handler) startProcess(s *session, args ...string) error {
-	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, args...)
+	s.mu.Lock()
+	cwd := s.cwd
+	s.mu.Unlock()
+
+	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, args...)
 	if err != nil {
 		return err
 	}
 
-	// Capture cwd and git HEAD for diff tracking
-	cwd, _ := os.Getwd()
-
 	s.mu.Lock()
 	s.pty = ptySess
 	s.exited = false
-	s.cwd = cwd
 	s.mu.Unlock()
 
 	go h.readPtyLoop(s)
@@ -370,7 +375,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sessionID = "default"
 	}
 
-	s, err := h.getOrCreateSession(sessionID)
+	cwd := r.URL.Query().Get("cwd")
+	s, err := h.getOrCreateSession(sessionID, cwd)
 	if err != nil {
 		log.Printf("Start session %s: %v", sessionID, err)
 		conn.WriteJSON(message{Type: "error", Data: err.Error()})
@@ -447,6 +453,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				select {
 				case s.restartCh <- restartRequest{resumeSessionID: sessionToResume}:
 				default:
+				}
+			}
+		case "set_cwd":
+			newCwd := msg.Data
+			if newCwd != "" {
+				if info, err := os.Stat(newCwd); err == nil && info.IsDir() {
+					s.mu.Lock()
+					s.cwd = newCwd
+					s.mu.Unlock()
+					log.Printf("Session %s: cwd changed to %s", s.id, newCwd)
+					select {
+					case s.restartCh <- restartRequest{}:
+					default:
+					}
 				}
 			}
 		}

@@ -8,7 +8,7 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: string | null; onSendInput?: (text: string) => void }) {
+export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPath?: string | null; onSendInput?: (text: string) => void; cwd?: string }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -18,7 +18,8 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
 
   useEffect(() => {
     const poll = () => {
-      fetch("/api/files/tree")
+      const cwdParam = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
+      fetch(`/api/files/tree${cwdParam}`)
         .then((r) => r.json())
         .then(setTree)
         .catch(() => {});
@@ -26,7 +27,7 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
     poll();
     const id = setInterval(poll, 3000);
     return () => clearInterval(id);
-  }, []);
+  }, [cwd]);
 
   // Open file when requested externally
   useEffect(() => {
@@ -38,7 +39,8 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
   const openFile = useCallback((path: string) => {
     setSelectedPath(path);
     setLoading(true);
-    fetch(`/api/files/read?path=${encodeURIComponent(path)}`)
+    const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
+    fetch(`/api/files/read?path=${encodeURIComponent(path)}${cwdParam}`)
       .then((r) => {
         if (!r.ok) throw new Error("not found");
         return r.json();
@@ -56,7 +58,7 @@ export function FileExplorer({ requestedPath, onSendInput }: { requestedPath?: s
         setFileContent("Failed to load file");
         setLoading(false);
       });
-  }, []);
+  }, [cwd]);
 
   return (
     <div className="flex flex-col h-full min-h-0">

@@ -19,11 +19,12 @@ import { SessionPanel, type SessionPanelHandle } from "./SessionPanel";
 interface PaneConfig {
   id: string;
   sessionId: string;
+  cwd: string; // empty = process cwd
 }
 
 export default function App() {
   const [panes, setPanes] = useState<PaneConfig[]>([
-    { id: "pane-1", sessionId: "session-1" },
+    { id: "pane-1", sessionId: "session-1", cwd: "" },
   ]);
   // Split positions between panes (percentage of total width for each divider)
   const [splits, setSplits] = useState<number[]>([]);
@@ -35,11 +36,12 @@ export default function App() {
   }, [showSettings]); // Re-fetch when settings modal closes
 
   const addPaneAt = useCallback((afterIndex: number) => {
-    const newId = `pane-${Date.now()}`;
-    const newSessionId = `session-${Date.now()}`;
     setPanes((prev) => {
+      const sourceCwd = prev[afterIndex]?.cwd ?? "";
+      const newId = `pane-${Date.now()}`;
+      const newSessionId = `session-${Date.now()}`;
       const next = [...prev];
-      next.splice(afterIndex + 1, 0, { id: newId, sessionId: newSessionId });
+      next.splice(afterIndex + 1, 0, { id: newId, sessionId: newSessionId, cwd: sourceCwd });
       const positions: number[] = [];
       for (let i = 1; i < next.length; i++) {
         positions.push((i / next.length) * 100);
@@ -47,6 +49,10 @@ export default function App() {
       setSplits(positions);
       return next;
     });
+  }, []);
+
+  const handleCwdChange = useCallback((paneId: string, newCwd: string) => {
+    setPanes((prev) => prev.map((p) => p.id === paneId ? { ...p, cwd: newCwd } : p));
   }, []);
 
   const removePane = useCallback((id: string) => {
@@ -123,6 +129,7 @@ export default function App() {
                 });
               }}
               swapEnterKeys={appConfig.swapEnterKeys}
+              onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
             />
           ))}
         </div>
@@ -150,9 +157,10 @@ interface PaneWithDividerProps {
   onAdd: () => void;
   onDividerDrag: (posPct: number) => void;
   swapEnterKeys: boolean;
+  onCwdChange: (newCwd: string) => void;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
   const {
     attributes,
@@ -194,6 +202,13 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
         {/* Toolbar */}
         <div className="absolute top-1 right-1 z-10 flex gap-1">
           <button
+            onClick={() => sessionRef.current?.openCwdPicker()}
+            className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
+            title="Change working directory"
+          >
+            📁
+          </button>
+          <button
             onClick={() => sessionRef.current?.openResumeModal()}
             className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
             title="Resume session"
@@ -222,6 +237,8 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           sessionId={pane.sessionId}
           dragHandleProps={{ ...attributes, ...listeners }}
           swapEnterKeys={swapEnterKeys}
+          cwd={pane.cwd}
+          onCwdChange={onCwdChange}
         />
       </div>
       {!isLast && (
