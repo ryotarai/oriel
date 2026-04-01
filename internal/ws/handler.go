@@ -14,6 +14,7 @@ import (
 	"github.com/ryotarai/oriel/internal/conversation"
 	"github.com/ryotarai/oriel/internal/diff"
 	ptylib "github.com/ryotarai/oriel/internal/pty"
+	"github.com/ryotarai/oriel/internal/state"
 )
 
 var upgrader = websocket.Upgrader{
@@ -84,13 +85,15 @@ func (s *subscriber) writeJSON(msg message) error {
 // passed as a query parameter (?session=<id>).
 type Handler struct {
 	command  string
+	store    *state.Store
 	mu       sync.Mutex
 	sessions map[string]*session
 }
 
-func NewHandler(command string) *Handler {
+func NewHandler(command string, store *state.Store) *Handler {
 	return &Handler{
 		command:  command,
+		store:    store,
 		sessions: make(map[string]*session),
 	}
 }
@@ -243,17 +246,6 @@ func (h *Handler) readPtyLoop(s *session) {
 			return
 		}
 
-		// Detect session end: "claude --resume <uuid>"
-		if m := resumePattern.FindStringSubmatch(text); m != nil {
-			oldSessionID := m[1]
-			log.Printf("Session %s: detected session end (old session: %s)", s.id, oldSessionID)
-			detectBuf.Reset()
-			select {
-			case s.restartCh <- restartRequest{}:
-			default:
-			}
-			return
-		}
 
 		// Detect working directory change (git worktree)
 		if m := worktreePattern.FindStringSubmatch(text); m != nil {

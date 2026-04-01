@@ -18,6 +18,7 @@ import (
 	"github.com/ryotarai/oriel/internal/commits"
 	"github.com/ryotarai/oriel/internal/config"
 	"github.com/ryotarai/oriel/internal/fileexplorer"
+	"github.com/ryotarai/oriel/internal/state"
 	"github.com/ryotarai/oriel/internal/ws"
 )
 
@@ -27,9 +28,15 @@ func main() {
 	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
 	flag.Parse()
 
-	token := auth.GenerateToken()
+	store, err := state.Open(state.DefaultPath())
+	if err != nil {
+		log.Fatalf("Failed to open state database: %v", err)
+	}
+	defer store.Close()
 
-	handler := ws.NewHandler(*command)
+	token := auth.LoadOrGenerateToken(store)
+
+	handler := ws.NewHandler(*command, store)
 
 	distFS, err := fs.Sub(frontend.Dist, "dist")
 	if err != nil {
