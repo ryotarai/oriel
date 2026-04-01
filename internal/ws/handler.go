@@ -186,10 +186,11 @@ func (h *Handler) restartLoop(s *session) {
 			oldPty.Close()
 		}
 
-		// Clear conversation history and PTY output buffer, notify frontend
+		// Clear conversation history, PTY output buffer, and session ID; notify frontend
 		s.mu.Lock()
 		s.convHistory = nil
 		s.ptyOutputBuf = nil
+		s.claudeSessionID = ""
 		cwd := s.cwd
 		s.mu.Unlock()
 		h.broadcast(s, message{Type: "conversation_reset"})
@@ -551,6 +552,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ptySnapshot = make([]byte, len(s.ptyOutputBuf))
 		copy(ptySnapshot, s.ptyOutputBuf)
 	}
+	claudeSessID := s.claudeSessionID
 	exited := s.exited
 	s.mu.Unlock()
 
@@ -576,6 +578,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		sub.writeJSON(message{Type: "conversation", Entry: entryJSON})
+	}
+
+	// Replay discovered Claude session UUID so the frontend can update its state
+	if claudeSessID != "" {
+		sub.writeJSON(message{Type: "claude_session_id", Data: claudeSessID})
 	}
 
 	// Send resolved cwd to client
