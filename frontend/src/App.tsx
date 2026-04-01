@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { SettingsPage } from "./components/SettingsPage";
+import { BottomTabBar } from "./components/BottomTabBar";
 import {
   DndContext,
   PointerSensor,
@@ -22,21 +23,101 @@ interface PaneConfig {
   cwd: string; // empty = process cwd
 }
 
+interface TabConfig {
+  id: string;
+  name: string;
+  panes: PaneConfig[];
+  splits: number[];
+  activePaneIndex: number;
+}
+
+let tabCounter = 1;
+
+function makeTab(name: string, cwd: string): TabConfig {
+  const id = `tab-${Date.now()}-${tabCounter}`;
+  tabCounter++;
+  return {
+    id,
+    name,
+    panes: [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, cwd }],
+    splits: [],
+    activePaneIndex: 0,
+  };
+}
+
 export default function App() {
-  const [panes, setPanes] = useState<PaneConfig[]>([
-    { id: "pane-1", sessionId: "session-1", cwd: "" },
-  ]);
-  // Split positions between panes (percentage of total width for each divider)
-  const [splits, setSplits] = useState<number[]>([]);
+  const [tabs, setTabs] = useState<TabConfig[]>([makeTab("Tab 1", "")]);
+  const [activeTabId, setActiveTabId] = useState(tabs[0].id);
   const [showSettings, setShowSettings] = useState(false);
   const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean }>({ swapEnterKeys: true });
   const paneRefs = useRef<Map<string, SessionPanelHandle>>(new Map());
-  const [activePaneIndex, setActivePaneIndex] = useState(0);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+
+  // Load saved state on mount
+  useEffect(() => {
+    fetch("/api/state")
+      .then((r) => r.json())
+      .then((data: { tabs: Array<{ id: string; name: string; position: number }>; panes: Array<{ id: string; tabId: string; sessionId: string; cwd: string; worktreeDir: string; position: number }> }) => {
+        if (data.tabs && data.tabs.length > 0) {
+          const loadedTabs: TabConfig[] = data.tabs
+            .sort((a, b) => a.position - b.position)
+            .map((t) => {
+              const tabPanes = data.panes
+                .filter((p) => p.tabId === t.id)
+                .sort((a, b) => a.position - b.position)
+                .map((p) => ({ id: p.id, sessionId: p.sessionId, cwd: p.cwd }));
+              // Update tabCounter to avoid collisions
+              const num = parseInt(t.name.replace("Tab ", ""), 10);
+              if (!isNaN(num) && num >= tabCounter) tabCounter = num + 1;
+              return {
+                id: t.id,
+                name: t.name,
+                panes: tabPanes.length > 0 ? tabPanes : [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, cwd: "" }],
+                splits: [],
+                activePaneIndex: 0,
+              };
+            });
+          setTabs(loadedTabs);
+          setActiveTabId(loadedTabs[0].id);
+        }
+        setInitialLoadDone(true);
+      })
+      .catch(() => setInitialLoadDone(true));
+  }, []);
+
+  // Save state whenever tabs change (after initial load)
+  const saveState = useCallback((currentTabs: TabConfig[]) => {
+    const tabsPayload = currentTabs.map((t, i) => ({ id: t.id, name: t.name, position: i }));
+    const panesPayload = currentTabs.flatMap((t) =>
+      t.panes.map((p, i) => ({
+        id: p.id,
+        tabId: t.id,
+        sessionId: p.sessionId,
+        cwd: p.cwd,
+        worktreeDir: "",
+        position: i,
+      }))
+    );
+    fetch("/api/state/save", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tabs: tabsPayload, panes: panesPayload }),
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (initialLoadDone) {
+      saveState(tabs);
+    }
+  }, [tabs, initialLoadDone, saveState]);
 
   useEffect(() => {
     fetch("/api/config").then((r) => r.json()).then(setAppConfig).catch(() => {});
-  }, [showSettings]); // Re-fetch when settings modal closes
+  }, [showSettings]);
 
+  // Cmd+Left/Right pane navigation (scoped to active tab)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
@@ -44,53 +125,58 @@ export default function App() {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
       e.preventDefault();
-      const targetIndex = e.key === "ArrowLeft" ? activePaneIndex - 1 : activePaneIndex + 1;
-      if (targetIndex < 0 || targetIndex >= panes.length) return;
+      const targetIndex = e.key === "ArrowLeft" ? activeTab.activePaneIndex - 1 : activeTab.activePaneIndex + 1;
+      if (targetIndex < 0 || targetIndex >= activeTab.panes.length) return;
 
-      const targetPane = panes[targetIndex];
+      const targetPane = activeTab.panes[targetIndex];
       const handle = paneRefs.current.get(targetPane.id);
       if (handle) {
         handle.focus();
-        setActivePaneIndex(targetIndex);
+        updateActiveTab((tab) => ({ ...tab, activePaneIndex: targetIndex }));
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activePaneIndex, panes]);
+  }, [activeTab]);
+
+  // Helper to update the active tab
+  const updateActiveTab = useCallback((updater: (tab: TabConfig) => TabConfig) => {
+    setTabs((prev) => prev.map((t) => t.id === activeTabId ? updater(t) : t));
+  }, [activeTabId]);
 
   const addPaneAt = useCallback((afterIndex: number) => {
-    setPanes((prev) => {
-      const sourceCwd = prev[afterIndex]?.cwd ?? "";
+    updateActiveTab((tab) => {
+      const sourceCwd = tab.panes[afterIndex]?.cwd ?? "";
       const newId = `pane-${Date.now()}`;
       const newSessionId = `session-${Date.now()}`;
-      const next = [...prev];
+      const next = [...tab.panes];
       next.splice(afterIndex + 1, 0, { id: newId, sessionId: newSessionId, cwd: sourceCwd });
       const positions: number[] = [];
       for (let i = 1; i < next.length; i++) {
         positions.push((i / next.length) * 100);
       }
-      setSplits(positions);
-      return next;
+      return { ...tab, panes: next, splits: positions };
     });
-  }, []);
+  }, [updateActiveTab]);
 
   const handleCwdChange = useCallback((paneId: string, newCwd: string) => {
-    setPanes((prev) => prev.map((p) => p.id === paneId ? { ...p, cwd: newCwd } : p));
-  }, []);
+    updateActiveTab((tab) => ({
+      ...tab,
+      panes: tab.panes.map((p) => p.id === paneId ? { ...p, cwd: newCwd } : p),
+    }));
+  }, [updateActiveTab]);
 
   const removePane = useCallback((id: string) => {
-    setPanes((prev) => {
-      if (prev.length <= 1) return prev;
-      const next = prev.filter((p) => p.id !== id);
-      // Recalculate splits
+    updateActiveTab((tab) => {
+      if (tab.panes.length <= 1) return tab;
+      const next = tab.panes.filter((p) => p.id !== id);
       const positions: number[] = [];
       for (let i = 1; i < next.length; i++) {
         positions.push((i / next.length) * 100);
       }
-      setSplits(positions);
-      return next;
+      return { ...tab, panes: next, splits: positions };
     });
-  }, []);
+  }, [updateActiveTab]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -102,83 +188,110 @@ export default function App() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    setPanes((prev) => {
-      const oldIndex = prev.findIndex((p) => p.id === active.id);
-      const newIndex = prev.findIndex((p) => p.id === over.id);
-      const newPanes = arrayMove(prev, oldIndex, newIndex);
-
-      // Reorder widths to follow the panes
-      setSplits((prevSplits) => {
-        const oldWidths = computeWidths(prev.length, prevSplits);
-        const newWidths = arrayMove(oldWidths, oldIndex, newIndex);
-        // Convert widths back to split positions (cumulative sums)
-        const newSplits: number[] = [];
-        let cumulative = 0;
-        for (let i = 0; i < newWidths.length - 1; i++) {
-          cumulative += newWidths[i];
-          newSplits.push(cumulative);
-        }
-        return newSplits;
-      });
-
-      return newPanes;
+    updateActiveTab((tab) => {
+      const oldIndex = tab.panes.findIndex((p) => p.id === active.id);
+      const newIndex = tab.panes.findIndex((p) => p.id === over.id);
+      const newPanes = arrayMove(tab.panes, oldIndex, newIndex);
+      const oldWidths = computeWidths(tab.panes.length, tab.splits);
+      const newWidths = arrayMove(oldWidths, oldIndex, newIndex);
+      const newSplits: number[] = [];
+      let cumulative = 0;
+      for (let i = 0; i < newWidths.length - 1; i++) {
+        cumulative += newWidths[i];
+        newSplits.push(cumulative);
+      }
+      return { ...tab, panes: newPanes, splits: newSplits };
     });
+  }, [updateActiveTab]);
+
+  // Tab management
+  const addTab = useCallback(() => {
+    const newTab = makeTab(`Tab ${tabCounter}`, "");
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newTab.id);
   }, []);
 
-  // Calculate pane widths from split positions
-  const paneWidths = computeWidths(panes.length, splits);
+  const deleteTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((t) => t.id !== id);
+      if (activeTabId === id) {
+        setActiveTabId(next[0].id);
+      }
+      return next;
+    });
+  }, [activeTabId]);
+
+  const renameTab = useCallback((id: string, name: string) => {
+    setTabs((prev) => prev.map((t) => t.id === id ? { ...t, name } : t));
+  }, []);
+
+  const paneWidths = computeWidths(activeTab.panes.length, activeTab.splits);
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <SortableContext items={panes.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
-        <div className="h-screen w-screen bg-[#0a0a0f] flex overflow-hidden relative">
-          {/* Settings button */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="fixed bottom-2 right-2 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
-            title="Settings"
-          >
-            ⚙
-          </button>
-          {showSettings && (
-            <div className="absolute inset-0 z-30 bg-black/70 flex items-start justify-center pt-16">
-              <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-                  <h2 className="text-gray-100 font-medium">Settings</h2>
-                  <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
+    <div className="h-screen w-screen bg-[#0a0a0f] flex flex-col overflow-hidden">
+      {/* Main pane area */}
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <SortableContext items={activeTab.panes.map((p) => p.id)} strategy={horizontalListSortingStrategy}>
+          <div className="flex-1 flex overflow-hidden relative min-h-0">
+            {/* Settings button */}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="fixed bottom-10 right-2 z-20 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs px-2 py-0.5 rounded border border-gray-600"
+              title="Settings"
+            >
+              ⚙
+            </button>
+            {showSettings && (
+              <div className="absolute inset-0 z-30 bg-black/70 flex items-start justify-center pt-16">
+                <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+                    <h2 className="text-gray-100 font-medium">Settings</h2>
+                    <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
+                  </div>
+                  <SettingsPage />
                 </div>
-                <SettingsPage />
               </div>
-            </div>
-          )}
-          {panes.map((pane, i) => (
-            <PaneWithDivider
-              key={pane.id}
-              pane={pane}
-              width={paneWidths[i]}
-              isLast={i === panes.length - 1}
-              showClose={panes.length > 1}
-              onClose={() => removePane(pane.id)}
-              onAdd={() => addPaneAt(i)}
-              onDividerDrag={(posPct) => {
-                setSplits((prev) => {
-                  const next = [...prev];
-                  next[i] = Math.max(10, Math.min(90, posPct));
-                  return next;
-                });
-              }}
-              swapEnterKeys={appConfig.swapEnterKeys}
-              onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
-              onRef={(handle) => {
-                if (handle) paneRefs.current.set(pane.id, handle);
-                else paneRefs.current.delete(pane.id);
-              }}
-              onFocus={() => setActivePaneIndex(i)}
-            />
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
+            )}
+            {activeTab.panes.map((pane, i) => (
+              <PaneWithDivider
+                key={pane.id}
+                pane={pane}
+                width={paneWidths[i]}
+                isLast={i === activeTab.panes.length - 1}
+                showClose={activeTab.panes.length > 1}
+                onClose={() => removePane(pane.id)}
+                onAdd={() => addPaneAt(i)}
+                onDividerDrag={(posPct) => {
+                  updateActiveTab((tab) => {
+                    const next = [...tab.splits];
+                    next[i] = Math.max(10, Math.min(90, posPct));
+                    return { ...tab, splits: next };
+                  });
+                }}
+                swapEnterKeys={appConfig.swapEnterKeys}
+                onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
+                onRef={(handle) => {
+                  if (handle) paneRefs.current.set(pane.id, handle);
+                  else paneRefs.current.delete(pane.id);
+                }}
+                onFocus={() => updateActiveTab((tab) => ({ ...tab, activePaneIndex: i }))}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {/* Bottom tab bar */}
+      <BottomTabBar
+        tabs={tabs.map((t) => ({ id: t.id, name: t.name }))}
+        activeTabId={activeTabId}
+        onSelectTab={setActiveTabId}
+        onAddTab={addTab}
+        onDeleteTab={deleteTab}
+        onRenameTab={renameTab}
+      />
+    </div>
   );
 }
 
