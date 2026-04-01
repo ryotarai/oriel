@@ -30,10 +30,33 @@ export default function App() {
   const [splits, setSplits] = useState<number[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean }>({ swapEnterKeys: true });
+  const paneRefs = useRef<Map<string, SessionPanelHandle>>(new Map());
+  const [activePaneIndex, setActivePaneIndex] = useState(0);
 
   useEffect(() => {
     fetch("/api/config").then((r) => r.json()).then(setAppConfig).catch(() => {});
   }, [showSettings]); // Re-fetch when settings modal closes
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+
+      e.preventDefault();
+      const targetIndex = e.key === "ArrowLeft" ? activePaneIndex - 1 : activePaneIndex + 1;
+      if (targetIndex < 0 || targetIndex >= panes.length) return;
+
+      const targetPane = panes[targetIndex];
+      const handle = paneRefs.current.get(targetPane.id);
+      if (handle) {
+        handle.focus();
+        setActivePaneIndex(targetIndex);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activePaneIndex, panes]);
 
   const addPaneAt = useCallback((afterIndex: number) => {
     setPanes((prev) => {
@@ -146,6 +169,11 @@ export default function App() {
               }}
               swapEnterKeys={appConfig.swapEnterKeys}
               onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
+              onRef={(handle) => {
+                if (handle) paneRefs.current.set(pane.id, handle);
+                else paneRefs.current.delete(pane.id);
+              }}
+              onFocus={() => setActivePaneIndex(i)}
             />
           ))}
         </div>
@@ -174,10 +202,13 @@ interface PaneWithDividerProps {
   onDividerDrag: (posPct: number) => void;
   swapEnterKeys: boolean;
   onCwdChange: (newCwd: string) => void;
+  onRef: (handle: SessionPanelHandle | null) => void;
+  onFocus: () => void;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange, onRef, onFocus }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
+  const paneContainerRef = useRef<HTMLDivElement>(null);
   const {
     attributes,
     listeners,
@@ -212,9 +243,26 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
     [onDividerDrag],
   );
 
+  useEffect(() => {
+    onRef(sessionRef.current);
+    return () => onRef(null);
+  });
+
+  useEffect(() => {
+    const el = paneContainerRef.current;
+    if (!el) return;
+    const handler = () => onFocus();
+    el.addEventListener("focusin", handler);
+    return () => el.removeEventListener("focusin", handler);
+  }, [onFocus]);
+
   return (
     <>
-      <div ref={setNodeRef} style={style} className="h-full min-w-0 relative">
+      <div
+        ref={(node) => { setNodeRef(node); (paneContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }}
+        style={style}
+        className="h-full min-w-0 relative"
+      >
         {/* Toolbar */}
         <div className="absolute top-1 right-1 z-10 flex gap-1">
           <button

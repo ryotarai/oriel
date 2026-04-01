@@ -38,6 +38,7 @@ interface SessionSummary {
 export interface SessionPanelHandle {
   openResumeModal: () => void;
   openCwdPicker: () => void;
+  focus: () => void;
 }
 
 interface SessionPanelProps {
@@ -162,6 +163,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   useImperativeHandle(ref, () => ({
     openResumeModal,
     openCwdPicker: () => { setShowCwdPicker(true); fetchDirs(cwd ?? ""); },
+    focus: () => { termRef.current?.focus(); },
   }), [openResumeModal, fetchDirs, cwd]);
 
   useEffect(() => {
