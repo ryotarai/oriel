@@ -21,6 +21,12 @@ interface ConversationEntry {
   isError?: boolean;
 }
 
+interface TaskItem {
+  taskId: string;
+  subject: string;
+  status: string;
+}
+
 interface SessionSummary {
   sessionId: string;
   firstMessage: string;
@@ -56,6 +62,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState(false);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
 
   const sendInputToTerminal = useCallback((text: string) => {
     const ws = wsRef.current;
@@ -230,6 +237,55 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
   }, [entries]);
 
+  // Extract task state from conversation entries
+  useEffect(() => {
+    const taskMap = new Map<string, TaskItem>();
+
+    for (const entry of entries) {
+      if (entry.type !== "tool_use") continue;
+      try {
+        const input = JSON.parse(entry.toolInput ?? "{}");
+        if (entry.toolName === "TaskCreate") {
+          taskMap.set(entry.toolUseId ?? entry.uuid, {
+            taskId: entry.toolUseId ?? entry.uuid,
+            subject: input.subject ?? "Task",
+            status: "pending",
+          });
+        } else if (entry.toolName === "TaskUpdate") {
+          const targetId = input.taskId;
+          if (targetId) {
+            for (const [, task] of taskMap) {
+              if (task.taskId === targetId || task.taskId.endsWith(`-${targetId}`)) {
+                if (input.status) task.status = input.status;
+                if (input.subject) task.subject = input.subject;
+                break;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Check tool_result entries for TaskCreate to get real taskId
+    for (const entry of entries) {
+      if (entry.type !== "tool_result" || !entry.toolUseId) continue;
+      const matchingUse = entries.find(
+        (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId && e.toolName === "TaskCreate"
+      );
+      if (matchingUse && entry.text) {
+        const idMatch = entry.text.match(/Task #(\d+)/i) || entry.text.match(/#(\d+)/);
+        if (idMatch) {
+          const existing = taskMap.get(matchingUse.toolUseId ?? matchingUse.uuid);
+          if (existing) {
+            existing.taskId = idMatch[1];
+          }
+        }
+      }
+    }
+
+    setTasks(Array.from(taskMap.values()));
+  }, [entries]);
+
   // Quote-reply: press "r" with selected text to insert as quote into terminal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -345,7 +401,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
         {/* Tab content */}
         {activeTab === "conversation" ? (
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 relative">
+            <TaskOverlay tasks={tasks} />
             <div className="flex items-center px-3 py-1 border-b border-gray-800">
               <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
                 <input
@@ -377,12 +434,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               )}
               {entries.filter((entry) => {
                 if (!showTools && (entry.type === "tool_use" || entry.type === "tool_result")) return false;
-                // Hide tool results for Edit and Write tools
+                // Hide TaskCreate/TaskUpdate tool blocks (shown as overlay instead)
+                if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
+                  return false;
+                }
+                // Hide tool results for Edit, Write, TaskCreate, TaskUpdate
                 if (entry.type === "tool_result") {
                   const matchingUse = entries.find(
                     (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
                   );
-                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write")) {
+                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write" || matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate")) {
                     return false;
                   }
                 }
@@ -710,6 +771,36 @@ function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
           {preview}
         </div>
       )}
+    </div>
+  );
+}
+
+function TaskOverlay({ tasks }: { tasks: TaskItem[] }) {
+  if (tasks.length === 0) return null;
+
+  return (
+    <div className="absolute top-10 right-2 z-10 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-lg backdrop-blur-sm overflow-hidden">
+      <div className="px-3 py-1.5 border-b border-gray-700 text-xs font-medium text-gray-300">
+        Tasks
+      </div>
+      <div className="max-h-48 overflow-y-auto">
+        {tasks.map((task) => (
+          <div key={task.taskId} className="px-3 py-1 flex items-center gap-2 text-xs">
+            <span className={
+              task.status === "completed" ? "text-green-400" :
+              task.status === "in_progress" ? "text-yellow-400" :
+              "text-gray-500"
+            }>
+              {task.status === "completed" ? "✓" : task.status === "in_progress" ? "●" : "○"}
+            </span>
+            <span className={
+              task.status === "completed" ? "text-gray-500 line-through" : "text-gray-300"
+            }>
+              {task.subject}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
