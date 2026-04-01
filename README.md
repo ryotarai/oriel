@@ -26,7 +26,7 @@ cd oriel
 make build
 ```
 
-This produces a single binary at `./bin/server` with the frontend assets embedded.
+This produces a single binary at `./bin/oriel` with the frontend assets embedded.
 
 ### Cross-platform builds
 
@@ -36,11 +36,11 @@ make build-all   # builds for linux/darwin × amd64/arm64 under bin/
 
 ## Usage
 
-Run the server from the directory where you want Claude Code to operate:
+Run Oriel from the directory where you want Claude Code to operate:
 
 ```bash
 cd /path/to/your/project
-/path/to/bin/server
+/path/to/bin/oriel
 ```
 
 The server starts, prints a URL with an auth token, and opens your browser automatically.
@@ -57,13 +57,13 @@ The server starts, prints a URL with an auth token, and opens your browser autom
 
 ```bash
 # Listen on a different port
-./bin/server -listen-addr localhost:3000
+./bin/oriel -listen-addr localhost:3000
 
 # Use a specific Claude Code binary
-./bin/server -command /usr/local/bin/claude
+./bin/oriel -command /usr/local/bin/claude
 
 # Don't auto-open browser (useful for remote/SSH)
-./bin/server -no-open
+./bin/oriel -no-open
 ```
 
 ## Interface

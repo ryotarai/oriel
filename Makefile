@@ -1,19 +1,16 @@
 .PHONY: dev build build-all test clean
 
 build: frontend-build
-	go build -o server ./cmd/server/
+	go build -o bin/oriel ./cmd/oriel/
 
 PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
-CMDS := server capture
 
 build-all: frontend-build
 	@for platform in $(PLATFORMS); do \
 		os=$${platform%/*}; \
 		arch=$${platform#*/}; \
-		for cmd in $(CMDS); do \
-			echo "Building $$cmd for $$os/$$arch..."; \
-			GOOS=$$os GOARCH=$$arch go build -o bin/$${cmd}-$${os}-$${arch} ./cmd/$$cmd/; \
-		done; \
+		echo "Building oriel for $$os/$$arch..."; \
+		GOOS=$$os GOARCH=$$arch go build -o bin/oriel-$${os}-$${arch} ./cmd/oriel/; \
 	done
 
 frontend-build:
@@ -28,6 +25,6 @@ test-frontend:
 	cd frontend && npx vitest run
 
 clean:
-	rm -f server capture
+	rm -f bin/oriel
 	rm -rf bin
 	rm -rf frontend/dist
