@@ -37,6 +37,8 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
   const seenUUIDs = useRef(new Set<string>());
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottom = useRef(true);
   const inputBuf = useRef("");
 
   const [splitPct, setSplitPct] = useState(70);
@@ -200,9 +202,24 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
     return () => clearTimeout(id);
   }, [splitPct]);
 
-  // Auto-scroll chat
+  // Track whether user is near the bottom of the chat scroll container
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const threshold = 80;
+      isNearBottom.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Auto-scroll chat only when user is near the bottom
+  useEffect(() => {
+    if (isNearBottom.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [entries]);
 
   // Quote-reply: press "r" with selected text to insert as quote into terminal
@@ -314,6 +331,7 @@ export function SessionPanel({ sessionId }: { sessionId: string }) {
         {/* Tab content */}
         {activeTab === "conversation" ? (
           <div
+            ref={chatScrollRef}
             className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col min-h-0 cursor-text"
             onClick={() => {
               const sel = window.getSelection();
