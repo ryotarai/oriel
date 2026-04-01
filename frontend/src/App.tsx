@@ -52,15 +52,25 @@ export default function App() {
     const lines = extractLines(ht.terminal.buffer.active as any);
 
     // Split lines into main content and bottom input area.
-    // The bottom area in Claude Code's terminal is always the last few lines:
-    // separator (────) + input prompt (❯) + separator (────) + status bar (⏵⏵)
-    // We search from the end for the first separator that starts the bottom area.
+    // Claude Code's bottom area (last ~6 lines) looks like:
+    //   separator (────)
+    //   ❯ <input text>
+    //   separator (────)
+    //   ⏵⏵ status bar
+    // We anchor on the ❯ prompt line (without bg=237, which is a submitted prompt),
+    // then take the separator above it as the split point.
     let bottomStartLine = lines.length;
-    for (let j = lines.length - 1; j >= Math.max(0, lines.length - 8); j--) {
+    for (let j = lines.length - 1; j >= Math.max(0, lines.length - 10); j--) {
       const text = lines[j].text.trim();
-      if (/^─+$/.test(text) && lines[j].spans.some(s => s.fg === 244)) {
+      if (text.startsWith("❯") && !lines[j].spans.some(s => s.bg === 237)) {
+        // Found the input prompt. Look for the separator above it.
         bottomStartLine = j;
-      } else if (bottomStartLine < lines.length) {
+        if (j > 0) {
+          const above = lines[j - 1].text.trim();
+          if (/^─+$/.test(above)) {
+            bottomStartLine = j - 1;
+          }
+        }
         break;
       }
     }
