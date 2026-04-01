@@ -23,15 +23,13 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
   }, []);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700">
-      {/* Pty prompt display */}
-      {bottomBlocks.length > 0 && (
-        <div className="font-mono text-sm px-2 pt-2">
-          {bottomBlocks.map((block, i) => (
-            <TerminalFallback key={i} lines={block.lines} />
-          ))}
-        </div>
-      )}
+    <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 min-h-[5rem]">
+      {/* Pty prompt display — fixed height to prevent layout jumps */}
+      <div className="font-mono text-sm px-2 pt-2 min-h-[3rem]">
+        {bottomBlocks.map((block, i) => (
+          <TerminalFallback key={i} lines={block.lines} />
+        ))}
+      </div>
 
       {/* IME-capable input: visually minimal but functional for IME */}
       <div className="px-2 pb-2 pt-1">
