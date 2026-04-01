@@ -187,21 +187,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
     ws.onclose = () => setConnected(false);
 
-    // Plain Enter → Ctrl+J (newline) only when Claude's input prompt (❯) is active
+    // Plain Enter → Ctrl+J (newline) when swap is enabled, otherwise normal Enter
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       // Don't intercept IME composition events (e.g. Japanese input confirm)
       if (e.isComposing || e.keyCode === 229) return true;
       if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
         if (!swapEnterRef.current) return true; // Swap disabled — normal Enter
-        // Scan visible buffer for Claude's ❯ prompt
-        const buf = term.buffer.active;
-        let hasPrompt = false;
-        for (let i = 0; i < buf.length; i++) {
-          const text = buf.getLine(i)?.translateToString().trim() ?? "";
-          if (text.startsWith("❯")) { hasPrompt = true; break; }
-        }
-        if (!hasPrompt) return true; // Not in Claude input — normal Enter
         // Send Ctrl+J (\n) instead of \r
         e.preventDefault();
         const bytes = new TextEncoder().encode("\n");
