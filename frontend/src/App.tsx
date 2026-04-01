@@ -1,268 +1,99 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useWebSocket, type ConversationEntry } from "./hooks/useWebSocket";
-import { HiddenTerminal } from "./terminal/HiddenTerminal";
-import { extractLines } from "./terminal/BufferReader";
-import { detectBlocks } from "./terminal/PatternDetector";
-import type { Block } from "./types";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-
-import { WelcomeCard } from "./components/WelcomeCard";
-import { ToolCallCard } from "./components/ToolCallCard";
-import { DiffView } from "./components/DiffView";
-import { SpinnerIndicator } from "./components/SpinnerIndicator";
-import { StatusBar } from "./components/StatusBar";
-import { TerminalFallback } from "./components/TerminalFallback";
-import { InputArea } from "./components/InputArea";
+import { useRef, useEffect, useState } from "react";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
 
 const WS_URL = `ws://${window.location.host}/ws`;
 
-/** Items displayed in the main content area */
-type DisplayItem =
-  | { kind: "pty-block"; block: Block; key: string }
-  | { kind: "conversation"; entry: ConversationEntry; key: string };
-
 export default function App() {
-  const [ptyBlocks, setPtyBlocks] = useState<Block[]>([]);
-  const [bottomBlocks, setBottomBlocks] = useState<Block[]>([]);
-  const [convEntries, setConvEntries] = useState<ConversationEntry[]>([]);
-  const [exited, setExited] = useState(false);
-  const hiddenTermRef = useRef<HiddenTerminal | null>(null);
-  const hiddenDivRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const seenUUIDs = useRef(new Set<string>());
+  const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (hiddenDivRef.current && !hiddenTermRef.current) {
-      const ht = new HiddenTerminal();
-      ht.mount(hiddenDivRef.current);
-      hiddenTermRef.current = ht;
-    }
+    if (!containerRef.current) return;
+
+    // Create terminal
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: "Menlo, Monaco, 'Courier New', monospace",
+      theme: {
+        background: "#0a0a0f",
+        foreground: "#e4e4e7",
+      },
+    });
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.open(containerRef.current);
+    fit.fit();
+    termRef.current = term;
+    fitRef.current = fit;
+
+    // Connect WebSocket
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnected(true);
+      // Send initial size
+      sendResize(ws, term.cols, term.rows);
+    };
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === "output") {
+        const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
+        term.write(bytes);
+      }
+    };
+
+    ws.onclose = () => setConnected(false);
+
+    // Terminal input → WebSocket → pty
+    term.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        const bytes = new TextEncoder().encode(data);
+        const base64 = btoa(String.fromCharCode(...bytes));
+        ws.send(JSON.stringify({ type: "input", data: base64 }));
+      }
+    });
+
+    // Resize handling
+    const onResize = () => {
+      fit.fit();
+      if (ws.readyState === WebSocket.OPEN) {
+        sendResize(ws, term.cols, term.rows);
+      }
+    };
+
+    term.onResize(({ cols, rows }) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        sendResize(ws, cols, rows);
+      }
+    });
+
+    window.addEventListener("resize", onResize);
+
     return () => {
-      hiddenTermRef.current?.dispose();
-      hiddenTermRef.current = null;
+      window.removeEventListener("resize", onResize);
+      ws.close();
+      term.dispose();
     };
   }, []);
 
-  const prevBottomRef = useRef<Block[]>([]);
-
-  const updateBlocks = useCallback(() => {
-    const ht = hiddenTermRef.current;
-    if (!ht) return;
-    const lines = extractLines(ht.terminal.buffer.active as any);
-
-    // Split lines into main content and bottom input area.
-    // Claude Code's bottom area (last ~6 lines) looks like:
-    //   separator (────)
-    //   ❯ <input text>
-    //   separator (────)
-    //   ⏵⏵ status bar
-    // We anchor on the ❯ prompt line (without bg=237, which is a submitted prompt),
-    // then take the separator above it as the split point.
-    let bottomStartLine = lines.length;
-    for (let j = lines.length - 1; j >= Math.max(0, lines.length - 10); j--) {
-      const text = lines[j].text.trim();
-      if (text.startsWith("❯") && !lines[j].spans.some(s => s.bg === 237)) {
-        // Found the input prompt. Look for the separator above it.
-        bottomStartLine = j;
-        if (j > 0) {
-          const above = lines[j - 1].text.trim();
-          if (/^─+$/.test(above)) {
-            bottomStartLine = j - 1;
-          }
-        }
-        break;
-      }
-    }
-
-    const mainLines = lines.slice(0, bottomStartLine);
-    const bottomLines = lines.slice(bottomStartLine);
-
-    const detected = detectBlocks(mainLines);
-    const bottomDetected = detectBlocks(bottomLines);
-
-    setPtyBlocks(detected);
-
-    // Only update bottom blocks if we found a valid bottom area.
-    // During redraws the bottom may temporarily disappear — keep the previous one.
-    if (bottomDetected.length > 0) {
-      prevBottomRef.current = bottomDetected;
-      setBottomBlocks(bottomDetected);
-    }
-    // else: keep previous bottomBlocks unchanged
-  }, []);
-
-  const handleConversation = useCallback((entry: ConversationEntry) => {
-    if (seenUUIDs.current.has(entry.uuid)) return;
-    seenUUIDs.current.add(entry.uuid);
-    if (entry.isThinking) return; // skip thinking blocks
-    setConvEntries((prev) => [...prev, entry]);
-  }, []);
-
-  const { connected, sendInput } = useWebSocket({
-    url: WS_URL,
-    onOutput: (data) => {
-      hiddenTermRef.current?.write(data);
-      requestAnimationFrame(updateBlocks);
-    },
-    onExit: () => setExited(true),
-    onConversation: handleConversation,
-  });
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [ptyBlocks, convEntries]);
-
-  // Build display items: use conversation entries for user/assistant text,
-  // pty blocks for everything else (welcome, tool calls, diffs, spinners)
-  const displayItems = buildDisplayItems(ptyBlocks, convEntries);
-
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
-      <div ref={hiddenDivRef} className="absolute -left-[9999px] w-0 h-0 overflow-hidden" />
-
-      {!connected && !exited && (
-        <div className="p-4 text-center text-yellow-400">Connecting...</div>
+    <div className="h-screen w-screen bg-[#0a0a0f] flex flex-col">
+      {!connected && (
+        <div className="p-2 text-center text-yellow-400 text-sm">Connecting...</div>
       )}
-      {exited && (
-        <div className="p-4 text-center text-red-400">
-          Session ended.{" "}
-          <button onClick={() => window.location.reload()} className="underline hover:text-red-300">
-            Restart
-          </button>
-        </div>
-      )}
-
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-24">
-        {displayItems.map((item) => {
-          if (item.kind === "conversation") {
-            return <ConversationMessage key={item.key} entry={item.entry} />;
-          }
-          return <PtyBlockRenderer key={item.key} block={item.block} />;
-        })}
-      </div>
-
-      <InputArea onKeyData={sendInput} bottomBlocks={bottomBlocks} />
+      <div ref={containerRef} className="flex-1" />
     </div>
   );
 }
 
-function buildDisplayItems(ptyBlocks: Block[], convEntries: ConversationEntry[]): DisplayItem[] {
-  const items: DisplayItem[] = [];
-
-  if (convEntries.length > 0) {
-    // When we have conversation entries, only show welcome from pty
-    // and use conversation entries for all user/assistant content
-    for (const block of ptyBlocks) {
-      if (block.type === "welcome") {
-        items.push({ kind: "pty-block", block, key: `pty-welcome` });
-        break;
-      }
-    }
-
-    // Show conversation entries (with proper markdown)
-    for (const entry of convEntries) {
-      items.push({ kind: "conversation", entry, key: `conv-${entry.uuid}` });
-    }
-  } else {
-    // No conversation entries yet — fall back to pty-only rendering
-    for (let i = 0; i < ptyBlocks.length; i++) {
-      items.push({ kind: "pty-block", block: ptyBlocks[i], key: `pty-${i}` });
-    }
-  }
-
-  return items;
-}
-
-function ConversationMessage({ entry }: { entry: ConversationEntry }) {
-  if (entry.role === "user") {
-    return (
-      <div className="my-3 flex justify-end px-4">
-        <div className="max-w-2xl rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100">
-          {entry.text}
-        </div>
-      </div>
-    );
-  }
-
-  // Assistant message — render as markdown
-  return (
-    <div className="my-3 px-4 prose prose-invert prose-sm max-w-none
-      prose-headings:text-gray-100 prose-headings:mt-4 prose-headings:mb-2
-      prose-p:text-gray-200 prose-p:leading-relaxed
-      prose-li:text-gray-200
-      prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded
-      prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg
-      prose-a:text-blue-400
-      prose-strong:text-gray-100
-    ">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {entry.text}
-      </ReactMarkdown>
-    </div>
-  );
-}
-
-function PtyBlockRenderer({ block }: { block: Block }) {
-  switch (block.type) {
-    case "welcome": return <WelcomeCard block={block} />;
-    case "user-prompt": return (
-      <div className="my-3 flex justify-end px-4">
-        <div className="max-w-2xl rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100">
-          {block.lines[0]?.text.replace(/^❯\s*/, "").trim()}
-        </div>
-      </div>
-    );
-    case "assistant-text": return (
-      <div className="my-1 px-4 text-gray-200 leading-relaxed">
-        {block.content ?? block.lines.map(l => l.text.trim()).join(" ")}
-      </div>
-    );
-    case "heading": return <Heading block={block} />;
-    case "bullet-list": return <BulletList block={block} />;
-    case "code-block": return (
-      <div className="my-3 mx-4 rounded-lg border border-gray-700 bg-gray-900 overflow-x-auto">
-        <div className="p-4"><TerminalFallback lines={block.lines} /></div>
-      </div>
-    );
-    case "tool-call": return <ToolCallCard block={block} />;
-    case "tool-result": return null;
-    case "diff": return <DiffView block={block} />;
-    case "spinner": return <SpinnerIndicator block={block} />;
-    case "separator": return <div className="my-2 border-t border-gray-800" />;
-    case "status-bar": return <StatusBar block={block} />;
-    case "input-prompt": return <TerminalFallback lines={block.lines} />;
-    default: return <TerminalFallback lines={block.lines} />;
-  }
-}
-
-function Heading({ block }: { block: Block }) {
-  const level = (block.meta?.level as number) ?? 2;
-  const text = block.content ?? block.lines[0]?.text ?? "";
-  if (level === 1) {
-    return <h2 className="text-xl font-bold text-gray-100 mt-4 mb-2 px-4">{text}</h2>;
-  }
-  return <h3 className="text-lg font-semibold text-gray-200 mt-3 mb-1 px-4">{text}</h3>;
-}
-
-function BulletList({ block }: { block: Block }) {
-  const items: string[] = [];
-  let current = "";
-  for (const line of block.lines) {
-    const text = line.text.trim();
-    if (text === "") continue;
-    if (text.startsWith("- ")) {
-      if (current) items.push(current);
-      current = text.slice(2);
-    } else {
-      current += " " + text;
-    }
-  }
-  if (current) items.push(current);
-
-  return (
-    <ul className="my-1 px-4 list-disc list-inside space-y-1 text-gray-200">
-      {items.map((item, i) => <li key={i}>{item}</li>)}
-    </ul>
-  );
+function sendResize(ws: WebSocket, cols: number, rows: number) {
+  ws.send(JSON.stringify({ type: "resize", cols, rows }));
 }
