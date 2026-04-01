@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import hljs from "highlight.js";
+import { abbreviateHome } from "../utils/paths";
 
 interface TreeNode {
   name: string;
@@ -72,6 +73,11 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
           />
           Wrap lines
         </label>
+        {cwd && (
+          <span className="ml-auto text-[10px] text-gray-600 font-mono truncate max-w-[50%]" title={cwd}>
+            {abbreviateHome(cwd)}
+          </span>
+        )}
       </div>
       <div className="flex flex-1 min-h-0">
         {/* File tree (left pane) */}

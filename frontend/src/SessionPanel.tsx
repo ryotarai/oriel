@@ -521,7 +521,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           </div>
         ) : activeTab === "diff" ? (
           <div className="flex-1 flex flex-col min-h-0">
-            <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} />
+            <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
           </div>
         ) : activeTab === "commits" ? (
           <div className="flex-1 flex flex-col min-h-0">

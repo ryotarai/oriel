@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState } from "react";
+import { abbreviateHome } from "../utils/paths";
 
 export interface FileDiffData {
   path: string;
@@ -9,6 +10,7 @@ export interface FileDiffData {
 interface DiffPanelProps {
   files: FileDiffData[];
   onSendInput?: (text: string) => void;
+  cwd?: string;
 }
 
 function statusColor(status: string): string {
@@ -29,7 +31,7 @@ function statusBgColor(status: string): string {
   }
 }
 
-export function DiffPanel({ files, onSendInput }: DiffPanelProps) {
+export function DiffPanel({ files, onSendInput, cwd }: DiffPanelProps) {
   const sectionRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [wrapLines, setWrapLines] = useState(true);
@@ -64,6 +66,11 @@ export function DiffPanel({ files, onSendInput }: DiffPanelProps) {
           />
           Wrap lines
         </label>
+        {cwd && (
+          <span className="ml-auto text-[10px] text-gray-600 font-mono truncate max-w-[50%]" title={cwd}>
+            {abbreviateHome(cwd)}
+          </span>
+        )}
       </div>
       <div className="flex flex-1 min-h-0">
         {/* File tree (left) */}

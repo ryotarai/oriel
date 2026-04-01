@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { abbreviateHome } from "../utils/paths";
 
 interface CommitSummary {
   hash: string;
@@ -39,7 +40,15 @@ export function CommitsPanel({ cwd }: { cwd?: string }) {
   }, [cwd]);
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="flex flex-col flex-1 min-h-0">
+      {cwd && (
+        <div className="flex items-center px-3 py-1 border-b border-gray-800">
+          <span className="ml-auto text-[10px] text-gray-600 font-mono truncate max-w-[50%]" title={cwd}>
+            {abbreviateHome(cwd)}
+          </span>
+        </div>
+      )}
+      <div className="flex flex-1 min-h-0">
       {/* Commit list (left) */}
       <div className="w-72 flex-shrink-0 border-r border-gray-800 overflow-y-auto">
         {commits.map((c) => (
@@ -84,6 +93,7 @@ export function CommitsPanel({ cwd }: { cwd?: string }) {
             Select a commit to view
           </div>
         )}
+      </div>
       </div>
     </div>
   );
