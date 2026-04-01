@@ -26,9 +26,14 @@ func main() {
 	listenAddr := flag.String("listen-addr", "localhost:9111", "Listen address (e.g. :8080, 127.0.0.1:3000)")
 	command := flag.String("command", "claude", "Command to run in pty")
 	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
+	stateDB := flag.String("state-db", "", "Path to state database (default: ~/.config/oriel/state.sqlite3)")
 	flag.Parse()
 
-	store, err := state.Open(state.DefaultPath())
+	dbPath := *stateDB
+	if dbPath == "" {
+		dbPath = state.DefaultPath()
+	}
+	store, err := state.Open(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to open state database: %v", err)
 	}
