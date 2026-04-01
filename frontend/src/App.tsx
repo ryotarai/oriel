@@ -1,203 +1,147 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import "@xterm/xterm/css/xterm.css";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useState, useCallback } from "react";
+import { SessionPanel } from "./SessionPanel";
 
-const WS_URL = `ws://${window.location.host}/ws`;
-
-interface ConversationEntry {
-  type: string;
-  role: string;
-  uuid: string;
-  text: string;
-  isThinking?: boolean;
+interface PaneConfig {
+  id: string;
+  sessionId: string;
 }
 
 export default function App() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [entries, setEntries] = useState<ConversationEntry[]>([]);
-  const seenUUIDs = useRef(new Set<string>());
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [panes, setPanes] = useState<PaneConfig[]>([
+    { id: "pane-1", sessionId: "session-1" },
+  ]);
+  // Split positions between panes (percentage of total width for each divider)
+  const [splits, setSplits] = useState<number[]>([]);
 
-  // Split position: percentage of viewport height for chat panel
-  const [splitPct, setSplitPct] = useState(70);
-  const dragging = useRef(false);
-
-  const handleConversation = useCallback((entry: ConversationEntry) => {
-    if (seenUUIDs.current.has(entry.uuid)) return;
-    seenUUIDs.current.add(entry.uuid);
-    if (entry.isThinking) return;
-    setEntries((prev) => [...prev, entry]);
+  const addPane = useCallback(() => {
+    const newId = `pane-${Date.now()}`;
+    const newSessionId = `session-${Date.now()}`;
+    setPanes((prev) => [...prev, { id: newId, sessionId: newSessionId }]);
+    // Distribute evenly
+    setSplits((prev) => {
+      const count = prev.length + 2; // new pane count
+      const positions: number[] = [];
+      for (let i = 1; i < count; i++) {
+        positions.push((i / count) * 100);
+      }
+      return positions;
+    });
   }, []);
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const term = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: "Menlo, Monaco, 'Courier New', monospace",
-      theme: {
-        background: "#0a0a0f",
-        foreground: "#e4e4e7",
-      },
+  const removePane = useCallback((id: string) => {
+    setPanes((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((p) => p.id !== id);
+      // Recalculate splits
+      const positions: number[] = [];
+      for (let i = 1; i < next.length; i++) {
+        positions.push((i / next.length) * 100);
+      }
+      setSplits(positions);
+      return next;
     });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(containerRef.current);
-    fit.fit();
-    fitRef.current = fit;
-
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      sendResize(ws, term.cols, term.rows);
-    };
-
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      if (msg.type === "output") {
-        const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
-        term.write(bytes);
-      } else if (msg.type === "conversation" && msg.entry) {
-        const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
-        handleConversation(entry);
-      }
-    };
-
-    ws.onclose = () => setConnected(false);
-
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        const bytes = new TextEncoder().encode(data);
-        const base64 = btoa(String.fromCharCode(...bytes));
-        ws.send(JSON.stringify({ type: "input", data: base64 }));
-      }
-    });
-
-    const onResize = () => {
-      fit.fit();
-      if (ws.readyState === WebSocket.OPEN) {
-        sendResize(ws, term.cols, term.rows);
-      }
-    };
-
-    term.onResize(({ cols, rows }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        sendResize(ws, cols, rows);
-      }
-    });
-
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      window.removeEventListener("resize", onResize);
-      ws.close();
-      term.dispose();
-    };
-  }, [handleConversation]);
-
-  // Re-fit terminal when split changes
-  useEffect(() => {
-    const id = setTimeout(() => fitRef.current?.fit(), 50);
-    return () => clearTimeout(id);
-  }, [splitPct]);
-
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [entries]);
-
-  // Drag handling
-  const onDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    dragging.current = true;
-
-    const onMove = (ev: MouseEvent) => {
-      if (!dragging.current) return;
-      const pct = (ev.clientY / window.innerHeight) * 100;
-      setSplitPct(Math.max(10, Math.min(90, pct)));
-    };
-    const onUp = () => {
-      dragging.current = false;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      // Re-fit after drag ends
-      setTimeout(() => fitRef.current?.fit(), 50);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
   }, []);
+
+  // Calculate pane widths from split positions
+  const paneWidths = computeWidths(panes.length, splits);
 
   return (
-    <div className="h-screen w-screen bg-[#0a0a0f] flex flex-col overflow-hidden">
-      {/* Chat panel (top) */}
-      <div style={{ height: `${splitPct}%` }} className="flex flex-col min-h-0">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {!connected && (
-            <div className="text-center text-yellow-400 text-sm">Connecting...</div>
-          )}
-          {entries.length === 0 && connected && (
-            <div className="text-gray-600 text-sm text-center mt-8">
-              Messages will appear here...
-            </div>
-          )}
-          {entries.map((entry) => (
-            <MessageBubble key={entry.uuid} entry={entry} />
-          ))}
-          <div ref={chatEndRef} />
-        </div>
-      </div>
-
-      {/* Drag handle */}
-      <div
-        onMouseDown={onDragStart}
-        className="h-1.5 bg-gray-800 hover:bg-blue-600 cursor-row-resize flex-shrink-0 transition-colors"
-      />
-
-      {/* Terminal (bottom) */}
-      <div style={{ height: `${100 - splitPct}%` }} className="min-h-0">
-        <div ref={containerRef} className="h-full" />
-      </div>
+    <div className="h-screen w-screen bg-[#0a0a0f] flex overflow-hidden">
+      {panes.map((pane, i) => (
+        <PaneWithDivider
+          key={pane.id}
+          pane={pane}
+          width={paneWidths[i]}
+          isLast={i === panes.length - 1}
+          showClose={panes.length > 1}
+          onClose={() => removePane(pane.id)}
+          onAdd={addPane}
+          onDividerDrag={(deltaPct) => {
+            setSplits((prev) => {
+              const next = [...prev];
+              next[i] = Math.max(10, Math.min(90, (next[i] ?? 50) + deltaPct));
+              return next;
+            });
+          }}
+        />
+      ))}
     </div>
   );
 }
 
-function MessageBubble({ entry }: { entry: ConversationEntry }) {
-  if (entry.role === "user") {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-4 py-2 text-gray-100 text-sm whitespace-pre-wrap">
-          {entry.text}
-        </div>
-      </div>
-    );
+function computeWidths(count: number, splits: number[]): number[] {
+  if (count === 1) return [100];
+  const points = [0, ...splits, 100];
+  const widths: number[] = [];
+  for (let i = 0; i < count; i++) {
+    widths.push((points[i + 1] ?? 100) - (points[i] ?? 0));
   }
-
-  return (
-    <div className="prose prose-invert prose-sm max-w-none
-      prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
-      prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
-      prose-li:text-gray-200 prose-li:my-0
-      prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
-      prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
-      prose-a:text-blue-400
-      prose-strong:text-gray-100
-    ">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-        {entry.text}
-      </ReactMarkdown>
-    </div>
-  );
+  return widths;
 }
 
-function sendResize(ws: WebSocket, cols: number, rows: number) {
-  ws.send(JSON.stringify({ type: "resize", cols, rows }));
+interface PaneWithDividerProps {
+  pane: PaneConfig;
+  width: number;
+  isLast: boolean;
+  showClose: boolean;
+  onClose: () => void;
+  onAdd: () => void;
+  onDividerDrag: (deltaPct: number) => void;
+}
+
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag }: PaneWithDividerProps) {
+  const onDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+
+      const onMove = (ev: MouseEvent) => {
+        const deltaPx = ev.clientX - startX;
+        const deltaPct = (deltaPx / window.innerWidth) * 100;
+        onDividerDrag(deltaPct);
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [onDividerDrag],
+  );
+
+  return (
+    <>
+      <div style={{ width: `${width}%` }} className="h-full min-w-0 relative">
+        {/* Toolbar */}
+        <div className="absolute top-1 right-1 z-10 flex gap-1">
+          {isLast && (
+            <button
+              onClick={onAdd}
+              className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
+              title="Add pane"
+            >
+              +
+            </button>
+          )}
+          {showClose && (
+            <button
+              onClick={onClose}
+              className="bg-gray-800 hover:bg-red-800 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
+              title="Close pane"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <SessionPanel sessionId={pane.sessionId} />
+      </div>
+      {!isLast && (
+        <div
+          onMouseDown={onDragStart}
+          className="w-1.5 bg-gray-800 hover:bg-blue-600 cursor-col-resize flex-shrink-0 transition-colors"
+        />
+      )}
+    </>
+  );
 }
