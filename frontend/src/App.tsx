@@ -79,7 +79,9 @@ export default function App() {
                 id: t.id,
                 name: t.name,
                 panes: tabPanes.length > 0 ? tabPanes : [{ id: `pane-${Date.now()}`, sessionId: `session-${Date.now()}`, claudeSessionId: "", cwd: "" }],
-                splits: [],
+                splits: tabPanes.length > 1
+                  ? Array.from({ length: tabPanes.length - 1 }, (_, i) => ((i + 1) / tabPanes.length) * 100)
+                  : [],
                 activePaneIndex: 0,
               };
             });
