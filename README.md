@@ -10,7 +10,7 @@ A web-based interface that wraps [Claude Code](https://docs.anthropic.com/en/doc
 - **Diff viewer** -- Shows all file changes made during the session with per-file unified diffs and syntax highlighting
 - **File explorer** -- Browse the working directory tree and view file contents; click file paths in the conversation to jump directly to them
 - **Multi-pane layout** -- Split the window into multiple independent Claude Code sessions with draggable dividers
-- **Session resume** -- Type `/resume` in the terminal to pick up a previous conversation
+- **Session resume** -- Click the resume button in the toolbar to pick up a previous conversation
 
 ## Prerequisites
 
