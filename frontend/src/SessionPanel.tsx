@@ -84,6 +84,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [showTools, setShowTools] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [worktreeDir, setWorktreeDir] = useState("");
+  const [running, setRunning] = useState(false);
+  const runningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const effectiveDir = worktreeDir || cwd || "";
 
@@ -196,6 +198,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (msg.type === "output") {
         const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
         term.write(bytes);
+        setRunning(true);
+        if (runningTimer.current) clearTimeout(runningTimer.current);
+        runningTimer.current = setTimeout(() => setRunning(false), 1500);
       } else if (msg.type === "conversation_reset") {
         term.reset();
         seenUUIDs.current.clear();
@@ -400,7 +405,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   return (
-    <div ref={panelRef} className="h-full flex flex-col overflow-hidden relative">
+    <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border ${running ? "pane-running" : "border-transparent"} transition-colors duration-500`}>
       {/* Chat panel (top) */}
       <div
         style={{ height: `${splitPct}%` }}
