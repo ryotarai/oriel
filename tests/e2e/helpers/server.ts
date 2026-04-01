@@ -44,12 +44,16 @@ export async function startOriel(opts?: {
 
   let token = "";
 
+  // Start from project root so Claude uses the correct CWD for session/history lookup
+  const projectRoot = path.resolve(__dirname, "../../..");
+
   const proc: ChildProcess = spawn(binPath, [
     "-listen-addr", addr,
     "-state-db", stateDbPath,
     "-no-open",
   ], {
     stdio: ["ignore", "pipe", "pipe"],
+    cwd: projectRoot,
     env: { ...process.env },
   });
 

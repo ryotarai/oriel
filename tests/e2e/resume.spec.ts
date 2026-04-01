@@ -111,23 +111,27 @@ test.describe("Resume session across restarts", () => {
     await page.goto(server.url);
     await waitForTerminalText(page);
 
-    // Add a new tab
-    await page.click('button[title="Add tab"]');
-    await page.waitForTimeout(2000);
+    // Wait for the sessions API to return data (PID file needs time to be created)
+    let sessions: unknown[] = [];
+    for (let i = 0; i < 20; i++) {
+      sessions = await page.evaluate(() => fetch("/api/sessions").then(r => r.json()));
+      if (Array.isArray(sessions) && sessions.length > 0) break;
+      await page.waitForTimeout(1000);
+    }
+    expect(sessions.length).toBeGreaterThan(0);
 
-    // Click the resume button in the new tab's pane
-    await page.click('button[title="Resume session"]');
-    await page.waitForTimeout(2000);
+    // Add a new tab (button title is "New tab")
+    await page.click('button[title="New tab"]');
+    await page.waitForTimeout(3000);
+
+    // Click the resume button (↻) in the new tab's pane
+    const resumeButtons = page.locator('button[title="Resume session"]');
+    await resumeButtons.last().click();
 
     // Click the first session in the resume modal list
-    const sessionItem = page.locator('[data-testid="session-item"]').first();
-    if (await sessionItem.isVisible()) {
-      await sessionItem.click();
-    } else {
-      // Fallback: click any clickable item in the modal
-      const modalItem = page.locator(".fixed.inset-0 button").filter({ hasNotText: "×" }).first();
-      await modalItem.click();
-    }
+    const sessionButton = page.locator("button").filter({ hasText: /messages/ }).first();
+    await sessionButton.waitFor({ state: "visible", timeout: 15_000 });
+    await sessionButton.click();
     await page.waitForTimeout(10_000);
 
     // Phase 3: Stop and restart again — the resumed session should persist
