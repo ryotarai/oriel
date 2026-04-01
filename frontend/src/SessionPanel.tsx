@@ -278,32 +278,20 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   useEffect(() => {
     const taskMap = new Map<string, TaskItem>();
 
+    // Pass 1: process TaskCreate tool_use entries, keyed by toolUseId
     for (const entry of entries) {
-      if (entry.type !== "tool_use") continue;
+      if (entry.type !== "tool_use" || entry.toolName !== "TaskCreate") continue;
       try {
         const input = JSON.parse(entry.toolInput ?? "{}");
-        if (entry.toolName === "TaskCreate") {
-          taskMap.set(entry.toolUseId ?? entry.uuid, {
-            taskId: entry.toolUseId ?? entry.uuid,
-            subject: input.subject ?? "Task",
-            status: "pending",
-          });
-        } else if (entry.toolName === "TaskUpdate") {
-          const targetId = input.taskId;
-          if (targetId) {
-            for (const [, task] of taskMap) {
-              if (task.taskId === targetId || task.taskId.endsWith(`-${targetId}`)) {
-                if (input.status) task.status = input.status;
-                if (input.subject) task.subject = input.subject;
-                break;
-              }
-            }
-          }
-        }
+        taskMap.set(entry.toolUseId ?? entry.uuid, {
+          taskId: entry.toolUseId ?? entry.uuid,
+          subject: input.subject ?? "Task",
+          status: "pending",
+        });
       } catch {}
     }
 
-    // Check tool_result entries for TaskCreate to get real taskId
+    // Pass 2: resolve numeric taskIds from tool_result entries so TaskUpdate can match
     for (const entry of entries) {
       if (entry.type !== "tool_result" || !entry.toolUseId) continue;
       const matchingUse = entries.find(
@@ -318,6 +306,24 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           }
         }
       }
+    }
+
+    // Pass 3: process TaskUpdate tool_use entries — numeric taskIds are now resolved
+    for (const entry of entries) {
+      if (entry.type !== "tool_use" || entry.toolName !== "TaskUpdate") continue;
+      try {
+        const input = JSON.parse(entry.toolInput ?? "{}");
+        const targetId = input.taskId;
+        if (targetId) {
+          for (const [, task] of taskMap) {
+            if (task.taskId === targetId || task.taskId.endsWith(`-${targetId}`)) {
+              if (input.status) task.status = input.status;
+              if (input.subject) task.subject = input.subject;
+              break;
+            }
+          }
+        }
+      } catch {}
     }
 
     setTasks(Array.from(taskMap.values()));
