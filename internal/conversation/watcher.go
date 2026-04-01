@@ -117,7 +117,9 @@ func SessionHasContent(cwd, sessionID string) bool {
 // WatchSession discovers the session JSONL from the child PID, reads existing
 // entries, then tails for new ones. Runs until done is closed.
 // If onSessionID is non-nil, it is called with the discovered Claude session UUID.
-func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}, onSessionID func(string)) {
+// If resumeSessionID is non-empty, the JSONL for that session is watched instead
+// of the discovered one (Claude --resume writes to the original session's file).
+func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}, onSessionID func(string), resumeSessionID string) {
 	log.Printf("Discovering session for PID %d...", childPID)
 
 	var projDir, sessionID string
@@ -141,7 +143,13 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		break
 	}
 
-	jsonlPath := filepath.Join(projDir, sessionID+".jsonl")
+	// When resuming, watch the original session's JSONL file because Claude
+	// --resume writes new entries there, not to the newly created session file.
+	watchID := sessionID
+	if resumeSessionID != "" {
+		watchID = resumeSessionID
+	}
+	jsonlPath := filepath.Join(projDir, watchID+".jsonl")
 	log.Printf("Watching JSONL: %s", jsonlPath)
 
 	// Wait for file to appear

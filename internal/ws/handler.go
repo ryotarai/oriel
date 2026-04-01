@@ -67,6 +67,11 @@ type session struct {
 	// The real Claude CLI session UUID (discovered from ~/.claude/sessions/<pid>.json)
 	claudeSessionID string
 
+	// The session ID being resumed (set when --resume is used); used to watch the
+	// correct JSONL file because Claude writes to the original session's file, not
+	// the newly created one.
+	resumeSessionID string
+
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
 }
@@ -129,6 +134,7 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 	// If resuming a previous Claude session, pass --resume flag
 	var args []string
 	if resumeID != "" && conversation.SessionHasContent(cwd, resumeID) {
+		s.resumeSessionID = resumeID
 		args = []string{"--resume", resumeID}
 		// Pre-load conversation history from the old session
 		oldEntries := conversation.ReadSessionEntries(cwd, resumeID)
@@ -191,12 +197,16 @@ func (h *Handler) restartLoop(s *session) {
 		s.convHistory = nil
 		s.ptyOutputBuf = nil
 		s.claudeSessionID = ""
+		s.resumeSessionID = ""
 		cwd := s.cwd
 		s.mu.Unlock()
 		h.broadcast(s, message{Type: "conversation_reset"})
 
 		// If resuming, load the old session's conversation entries
 		if req.resumeSessionID != "" && conversation.SessionHasContent(cwd, req.resumeSessionID) {
+			s.mu.Lock()
+			s.resumeSessionID = req.resumeSessionID
+			s.mu.Unlock()
 			oldEntries := conversation.ReadSessionEntries(cwd, req.resumeSessionID)
 			if len(oldEntries) > 0 {
 				s.mu.Lock()
@@ -298,6 +308,7 @@ func (h *Handler) watchConversation(s *session) {
 	s.mu.Lock()
 	pid := s.pty.Pid()
 	done := s.pty.Done()
+	resumeID := s.resumeSessionID
 	s.mu.Unlock()
 
 	convCh := make(chan conversation.ConversationEntry, 64)
@@ -308,7 +319,7 @@ func (h *Handler) watchConversation(s *session) {
 		s.mu.Unlock()
 		// Don't broadcast yet — wait until the session has conversation content
 		// so that empty sessions don't get a claudeSessionId saved to DB.
-	})
+	}, resumeID)
 
 	uuidBroadcast := false
 
@@ -334,10 +345,15 @@ func (h *Handler) watchConversation(s *session) {
 			s.mu.Unlock()
 			h.broadcast(s, message{Type: "conversation", Entry: entryJSON})
 
-			// After first real conversation entry, broadcast the UUID
+			// After first real conversation entry, broadcast the UUID to save to DB.
+			// For resumed sessions, broadcast the resume ID (Claude writes to the
+			// original session's JSONL, so that's the one to --resume on next restart).
 			if !uuidBroadcast {
 				s.mu.Lock()
 				uuid := s.claudeSessionID
+				if resumeID != "" {
+					uuid = resumeID
+				}
 				s.mu.Unlock()
 				if uuid != "" {
 					h.broadcast(s, message{Type: "claude_session_id", Data: uuid})
