@@ -40,6 +40,8 @@ type message struct {
 	Entry json.RawMessage `json:"entry,omitempty"`
 }
 
+const ptyOutputBufSize = 256 * 1024 // 256 KiB ring buffer for PTY output replay
+
 // session is a single persistent pty session.
 type session struct {
 	id  string
@@ -49,6 +51,9 @@ type session struct {
 	subs        map[*subscriber]struct{}
 	convHistory []conversation.ConversationEntry
 	exited      bool
+
+	// Ring buffer of raw PTY output for replaying to new subscribers
+	ptyOutputBuf []byte
 
 	// Current terminal size (for restart)
 	cols, rows uint16
@@ -181,9 +186,10 @@ func (h *Handler) restartLoop(s *session) {
 			oldPty.Close()
 		}
 
-		// Clear conversation history and notify frontend
+		// Clear conversation history and PTY output buffer, notify frontend
 		s.mu.Lock()
 		s.convHistory = nil
+		s.ptyOutputBuf = nil
 		cwd := s.cwd
 		s.mu.Unlock()
 		h.broadcast(s, message{Type: "conversation_reset"})
@@ -236,6 +242,15 @@ func (h *Handler) readPtyLoop(s *session) {
 		}
 
 		data := buf[:n]
+
+		// Buffer raw PTY output for replay to new subscribers
+		s.mu.Lock()
+		s.ptyOutputBuf = append(s.ptyOutputBuf, data...)
+		if len(s.ptyOutputBuf) > ptyOutputBufSize {
+			s.ptyOutputBuf = s.ptyOutputBuf[len(s.ptyOutputBuf)-ptyOutputBufSize:]
+		}
+		s.mu.Unlock()
+
 		h.broadcast(s, message{
 			Type: "output",
 			Data: base64.StdEncoding.EncodeToString(data),
@@ -530,6 +545,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.subs[sub] = struct{}{}
 	history := make([]conversation.ConversationEntry, len(s.convHistory))
 	copy(history, s.convHistory)
+	// Snapshot buffered PTY output for replay
+	var ptySnapshot []byte
+	if len(s.ptyOutputBuf) > 0 {
+		ptySnapshot = make([]byte, len(s.ptyOutputBuf))
+		copy(ptySnapshot, s.ptyOutputBuf)
+	}
 	exited := s.exited
 	s.mu.Unlock()
 
@@ -539,6 +560,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 		close(sub.doneCh)
 	}()
+
+	// Replay buffered PTY output so the terminal is not blank on reconnect
+	if len(ptySnapshot) > 0 {
+		sub.writeJSON(message{
+			Type: "output",
+			Data: base64.StdEncoding.EncodeToString(ptySnapshot),
+		})
+	}
 
 	// Replay conversation history
 	for _, entry := range history {
