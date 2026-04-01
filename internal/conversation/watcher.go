@@ -95,24 +95,6 @@ func readSessionMeta(pid int) (*sessionMeta, error) {
 	return &meta, nil
 }
 
-// DiscoverSessionID polls ~/.claude/sessions/<pid>.json until the Claude CLI
-// session UUID is available, then returns it.  Returns "" if done closes first.
-func DiscoverSessionID(childPID int, done <-chan struct{}) string {
-	for {
-		select {
-		case <-done:
-			return ""
-		default:
-		}
-		meta, err := readSessionMeta(childPID)
-		if err != nil {
-			time.Sleep(500 * time.Millisecond)
-			continue
-		}
-		return meta.SessionID
-	}
-}
-
 // ReadSessionEntries reads all conversation entries from a specific session's JSONL file.
 func ReadSessionEntries(cwd, sessionID string) []ConversationEntry {
 	projDir := projectDir(cwd)
@@ -122,7 +104,8 @@ func ReadSessionEntries(cwd, sessionID string) []ConversationEntry {
 
 // WatchSession discovers the session JSONL from the child PID, reads existing
 // entries, then tails for new ones. Runs until done is closed.
-func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}) {
+// If onSessionID is non-nil, it is called with the discovered Claude session UUID.
+func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}, onSessionID func(string)) {
 	log.Printf("Discovering session for PID %d...", childPID)
 
 	var projDir, sessionID string
@@ -140,6 +123,9 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		projDir = projectDir(meta.CWD)
 		sessionID = meta.SessionID
 		log.Printf("Session: %s (project: %s)", sessionID, projDir)
+		if onSessionID != nil {
+			onSessionID(sessionID)
+		}
 		break
 	}
 
