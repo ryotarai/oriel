@@ -69,7 +69,8 @@ export function InputArea({ onKeyData, bottomBlocks }: InputAreaProps) {
             }
           }}
           onKeyDown={(e) => {
-            if (composingRef.current || e.nativeEvent.isComposing) return;
+            // Skip IME-initiated keystrokes (keyCode 229 = IME processing)
+            if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return;
 
             const data = keyEventToData(e);
             if (data !== null) {
