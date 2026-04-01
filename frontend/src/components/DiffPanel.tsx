@@ -129,7 +129,6 @@ function DiffBlock({ diff, filePath, onSendInput }: { diff: string; filePath: st
           newLine++;
         } else if (line.startsWith("-")) {
           className += "text-red-300 bg-red-900/20";
-          lineNumber = oldLine;
           oldLine++;
         } else if (line.startsWith("diff --git")) {
           return null; // skip diff header lines
