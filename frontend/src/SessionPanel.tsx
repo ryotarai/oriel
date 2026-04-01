@@ -148,6 +148,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   const sendResume = useCallback((targetSessionId: string) => {
+    // Save the resume target to DB immediately so it persists across restarts
+    onClaudeSessionIdRef.current?.(targetSessionId);
     const ws = wsRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "resume", data: targetSessionId }));
