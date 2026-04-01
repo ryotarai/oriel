@@ -378,6 +378,105 @@ func (h *Handler) HandleDiff(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleSaveState saves the full tab/pane layout to the state database.
+func (h *Handler) HandleSaveState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var payload struct {
+		Tabs []struct {
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			Position int    `json:"position"`
+		} `json:"tabs"`
+		Panes []struct {
+			ID          string `json:"id"`
+			TabID       string `json:"tabId"`
+			SessionID   string `json:"sessionId"`
+			Cwd         string `json:"cwd"`
+			WorktreeDir string `json:"worktreeDir"`
+			Position    int    `json:"position"`
+		} `json:"panes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	tabs := make([]state.Tab, len(payload.Tabs))
+	for i, t := range payload.Tabs {
+		tabs[i] = state.Tab{ID: t.ID, Name: t.Name, Position: t.Position}
+	}
+	panes := make([]state.Pane, len(payload.Panes))
+	for i, p := range payload.Panes {
+		panes[i] = state.Pane{
+			ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
+			Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
+		}
+	}
+
+	if err := h.store.SaveFullState(tabs, panes); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleLoadState returns the saved tab/pane layout from the state database.
+func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tabs, err := h.store.ListTabs()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type paneJSON struct {
+		ID          string `json:"id"`
+		TabID       string `json:"tabId"`
+		SessionID   string `json:"sessionId"`
+		Cwd         string `json:"cwd"`
+		WorktreeDir string `json:"worktreeDir"`
+		Position    int    `json:"position"`
+	}
+	type tabJSON struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Position int    `json:"position"`
+	}
+
+	respTabs := make([]tabJSON, len(tabs))
+	var respPanes []paneJSON
+
+	for i, t := range tabs {
+		respTabs[i] = tabJSON{ID: t.ID, Name: t.Name, Position: t.Position}
+		panes, err := h.store.ListPanes(t.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, p := range panes {
+			respPanes = append(respPanes, paneJSON{
+				ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
+				Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
+			})
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"tabs":  respTabs,
+		"panes": respPanes,
+	})
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

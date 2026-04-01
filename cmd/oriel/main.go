@@ -55,6 +55,8 @@ func main() {
 	mux.HandleFunc("/api/config", handleConfig)
 	mux.HandleFunc("/api/commits", commits.HandleList)
 	mux.HandleFunc("/api/commits/show", commits.HandleShow)
+	mux.HandleFunc("/api/state", handler.HandleLoadState)
+	mux.HandleFunc("/api/state/save", handler.HandleSaveState)
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)
