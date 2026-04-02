@@ -13,7 +13,7 @@ type Config struct {
 
 var (
 	mu      sync.RWMutex
-	current = Config{SwapEnterKeys: true}
+	current = Config{SwapEnterKeys: false}
 )
 
 func configPath() string {
