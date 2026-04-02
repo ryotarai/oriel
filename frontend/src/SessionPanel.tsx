@@ -21,6 +21,8 @@ interface ConversationEntry {
   toolInput?: string;
   toolUseId?: string;
   isError?: boolean;
+  imageData?: string;
+  imageMediaType?: string;
 }
 
 interface TaskItem {
@@ -957,6 +959,22 @@ function shouldShowTimestamp(prev: string | undefined, curr: string | undefined)
 function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   if (entry.type === "tool_use") {
     return <ToolUseBlock entry={entry} />;
+  }
+
+  if (entry.type === "tool_result" && entry.imageData) {
+    return (
+      <div className="my-1">
+        <img
+          src={`data:${entry.imageMediaType};base64,${entry.imageData}`}
+          alt="Screenshot"
+          className="rounded-lg border border-gray-700 max-w-full max-h-96 cursor-pointer"
+          onClick={(e) => {
+            const img = e.currentTarget;
+            img.classList.toggle("max-h-96");
+          }}
+        />
+      </div>
+    );
   }
 
   if (entry.type === "tool_result") {

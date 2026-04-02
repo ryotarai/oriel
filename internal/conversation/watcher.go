@@ -65,6 +65,9 @@ type ConversationEntry struct {
 	ToolUseID string `json:"toolUseId,omitempty"`
 	// Tool result fields
 	IsError bool `json:"isError,omitempty"`
+	// Image fields (for tool_result image content)
+	ImageData      string `json:"imageData,omitempty"`
+	ImageMediaType string `json:"imageMediaType,omitempty"`
 }
 
 // sessionMeta matches ~/.claude/sessions/<pid>.json
@@ -347,17 +350,69 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				ToolUseID: block.ID,
 			})
 		case "tool_result":
-			text := extractToolResultText(block.Content)
-			entries = append(entries, ConversationEntry{
-				Type:      "tool_result",
-				Role:      msg.Type,
-				UUID:      uuid,
-				CWD:       msg.CWD,
-				Timestamp: msg.Timestamp,
-				Text:      text,
-				ToolUseID: block.ToolUseID,
-				IsError:   block.IsError,
-			})
+			type imageSource struct {
+				Type      string `json:"type"`
+				MediaType string `json:"media_type"`
+				Data      string `json:"data"`
+			}
+			type contentSubBlock struct {
+				Type   string       `json:"type"`
+				Text   string       `json:"text,omitempty"`
+				Source *imageSource `json:"source,omitempty"`
+			}
+
+			var subBlocks []contentSubBlock
+			parsed := false
+			if block.Content != nil {
+				if err := json.Unmarshal(block.Content, &subBlocks); err == nil {
+					parsed = true
+					var textParts []string
+					for _, sb := range subBlocks {
+						if sb.Type == "text" && sb.Text != "" {
+							textParts = append(textParts, sb.Text)
+						}
+						if sb.Type == "image" && sb.Source != nil {
+							imgUUID := fmt.Sprintf("%s-img-%d", msg.UUID, blockIdx)
+							blockIdx++
+							entries = append(entries, ConversationEntry{
+								Type:           "tool_result",
+								Role:           msg.Type,
+								UUID:           imgUUID,
+								CWD:            msg.CWD,
+								Timestamp:      msg.Timestamp,
+								ToolUseID:      block.ToolUseID,
+								ImageData:      sb.Source.Data,
+								ImageMediaType: sb.Source.MediaType,
+							})
+						}
+					}
+					if len(textParts) > 0 {
+						entries = append(entries, ConversationEntry{
+							Type:      "tool_result",
+							Role:      msg.Type,
+							UUID:      uuid,
+							CWD:       msg.CWD,
+							Timestamp: msg.Timestamp,
+							Text:      strings.Join(textParts, "\n"),
+							ToolUseID: block.ToolUseID,
+							IsError:   block.IsError,
+						})
+					}
+				}
+			}
+			if !parsed {
+				text := extractToolResultText(block.Content)
+				entries = append(entries, ConversationEntry{
+					Type:      "tool_result",
+					Role:      msg.Type,
+					UUID:      uuid,
+					CWD:       msg.CWD,
+					Timestamp: msg.Timestamp,
+					Text:      text,
+					ToolUseID: block.ToolUseID,
+					IsError:   block.IsError,
+				})
+			}
 		}
 	}
 	return entries
