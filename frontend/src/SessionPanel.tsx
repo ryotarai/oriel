@@ -71,6 +71,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const swapEnterRef = useRef(swapEnterKeys ?? true);
   useEffect(() => { swapEnterRef.current = swapEnterKeys ?? true; }, [swapEnterKeys]);
 
+  // Request notification permission on mount
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const onCwdChangeRef = useRef(onCwdChange);
   onCwdChangeRef.current = onCwdChange;
 
@@ -409,6 +416,18 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         setSuggestions([]);
         setSuggestionsLoading(true);
         ws.send(JSON.stringify({ type: "request_suggestions" }));
+      }
+
+      // Send desktop notification when not focused
+      if (document.hidden || !document.hasFocus()) {
+        if ("Notification" in window && Notification.permission === "granted") {
+          const lastEntry = entries[entries.length - 1];
+          const preview = lastEntry?.text?.slice(0, 80) || "Response complete";
+          new Notification("Oriel", {
+            body: preview + (lastEntry?.text && lastEntry.text.length > 80 ? "..." : ""),
+            tag: "oriel-response-" + sessionId,
+          });
+        }
       }
     }
   }, [running]);
