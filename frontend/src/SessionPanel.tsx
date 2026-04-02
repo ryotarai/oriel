@@ -568,7 +568,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 </div>
               )}
               {entries.filter((entry) => {
-                if (!showTools && (entry.type === "tool_use" || entry.type === "tool_result")) return false;
+                if (!showTools && entry.type === "tool_use") return false;
+                if (!showTools && entry.type === "tool_result") {
+                  // Show Agent tool results even when tools are hidden
+                  const matchingUse = entries.find(
+                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
+                  );
+                  if (!matchingUse || matchingUse.toolName !== "Agent") return false;
+                }
                 // Hide TaskCreate/TaskUpdate tool blocks (shown as overlay instead)
                 if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
                   return false;
@@ -587,9 +594,22 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   }
                 }
                 return true;
-              }).map((entry) => (
-                <MessageBubble key={entry.uuid} entry={entry} onOpenFile={openFileInExplorer} />
-              ))}
+              }).map((entry) => {
+                // Render Agent tool results as assistant messages (markdown)
+                const isAgentResult = entry.type === "tool_result" && (() => {
+                  const matchingUse = entries.find(
+                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
+                  );
+                  return matchingUse?.toolName === "Agent";
+                })();
+                return (
+                  <MessageBubble
+                    key={entry.uuid}
+                    entry={isAgentResult ? { ...entry, type: "assistant", role: "assistant" } : entry}
+                    onOpenFile={openFileInExplorer}
+                  />
+                );
+              })}
               <div ref={chatEndRef} />
               {/* Reply suggestions */}
               {suggestionsLoading && (
