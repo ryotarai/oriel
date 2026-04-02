@@ -544,23 +544,36 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 		Position int    `json:"position"`
 	}
 
-	respTabs := make([]tabJSON, len(tabs))
+	var respTabs []tabJSON
 	var respPanes []paneJSON
 
-	for i, t := range tabs {
-		respTabs[i] = tabJSON{ID: t.ID, Name: t.Name, Position: t.Position}
+	for _, t := range tabs {
 		panes, err := h.store.ListPanes(t.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		var tabPanes []paneJSON
 		for _, p := range panes {
-			respPanes = append(respPanes, paneJSON{
+			// Skip panes whose cwd no longer exists
+			if p.Cwd != "" {
+				if _, err := os.Stat(p.Cwd); os.IsNotExist(err) {
+					log.Printf("Skipping pane %s: cwd %s no longer exists", p.ID, p.Cwd)
+					continue
+				}
+			}
+			tabPanes = append(tabPanes, paneJSON{
 				ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
 				ClaudeSessionID: p.ClaudeSessionID,
 				Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 			})
 		}
+		// Skip tabs with no remaining panes
+		if len(tabPanes) == 0 {
+			continue
+		}
+		respTabs = append(respTabs, tabJSON{ID: t.ID, Name: t.Name, Position: t.Position})
+		respPanes = append(respPanes, tabPanes...)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
