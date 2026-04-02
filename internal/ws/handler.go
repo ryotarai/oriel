@@ -411,14 +411,6 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 	}
 	log.Printf("Session %s: watching %s for file changes", s.id, dir)
 
-	// Also watch .git directory for index/HEAD changes
-	gitDir := filepath.Join(dir, ".git")
-	if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
-		if err := watcher.Add(gitDir); err == nil {
-			log.Printf("Session %s: watching %s for git changes", s.id, gitDir)
-		}
-	}
-
 	var debounceTimer *time.Timer
 
 	for {
@@ -428,15 +420,23 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 				debounceTimer.Stop()
 			}
 			return
-		case _, ok := <-watcher.Events:
+		case ev, ok := <-watcher.Events:
 			if !ok {
 				return
+			}
+			// Only react to meaningful file operations (not Chmod)
+			if !ev.Has(fsnotify.Create) && !ev.Has(fsnotify.Write) && !ev.Has(fsnotify.Remove) && !ev.Has(fsnotify.Rename) {
+				continue
+			}
+			// Skip .git internal changes to avoid feedback loop with git commands
+			if strings.HasPrefix(filepath.Base(ev.Name), ".git") {
+				continue
 			}
 			// Debounce: reset timer on each event
 			if debounceTimer != nil {
 				debounceTimer.Stop()
 			}
-			debounceTimer = time.AfterFunc(500*time.Millisecond, func() {
+			debounceTimer = time.AfterFunc(1*time.Second, func() {
 				h.broadcast(s, message{Type: "files_changed"})
 			})
 		case err, ok := <-watcher.Errors:
