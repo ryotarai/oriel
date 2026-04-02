@@ -95,6 +95,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [worktreeDir, setWorktreeDir] = useState("");
   const [running, setRunning] = useState(false);
+  const [suggestions, setSuggestions] = useState<{ label: string; message: string }[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   const effectiveDir = worktreeDir || cwd || "";
 
@@ -225,6 +227,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       } else if (msg.type === "conversation" && msg.entry) {
         const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
         handleConversation(entry);
+      } else if (msg.type === "suggestions") {
+        try {
+          const parsed = JSON.parse(msg.data);
+          setSuggestions(Array.isArray(parsed) ? parsed : []);
+        } catch (e) {
+          console.warn("Failed to parse suggestions:", e);
+        }
+        setSuggestionsLoading(false);
+      } else if (msg.type === "suggestions_error") {
+        setSuggestionsLoading(false);
       }
     };
 
@@ -373,6 +385,31 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     // Otherwise (tool_use, tool_result, user input), Claude is actively working.
     setRunning(last.type !== "assistant");
   }, [entries]);
+
+  // Request reply suggestions when session becomes idle
+  const prevRunningRef = useRef(false);
+  useEffect(() => {
+    const wasRunning = prevRunningRef.current;
+    prevRunningRef.current = running;
+
+    if (wasRunning && !running && entries.length > 0) {
+      // Session just finished — request suggestions
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) {
+        setSuggestions([]);
+        setSuggestionsLoading(true);
+        ws.send(JSON.stringify({ type: "request_suggestions" }));
+      }
+    }
+  }, [running, entries.length]);
+
+  // Clear suggestions when user sends a new message (session becomes running again)
+  useEffect(() => {
+    if (running) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+    }
+  }, [running]);
 
   // Quote-reply: press "r" with selected text to insert as quote into terminal
   useEffect(() => {
@@ -555,6 +592,29 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 <MessageBubble key={entry.uuid} entry={entry} onOpenFile={openFileInExplorer} />
               ))}
               <div ref={chatEndRef} />
+              {/* Reply suggestions */}
+              {suggestionsLoading && (
+                <div className="flex gap-2 flex-wrap px-1">
+                  <span className="text-xs text-gray-500 animate-pulse">Generating suggestions...</span>
+                </div>
+              )}
+              {suggestions.length > 0 && !running && (
+                <div className="flex gap-2 flex-wrap px-1 pb-1">
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        sendInputToTerminal(s.message + "\r");
+                        setSuggestions([]);
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/50 transition-colors cursor-pointer"
+                      title={s.message}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           </div>
