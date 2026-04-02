@@ -783,7 +783,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             <CommitsPanel cwd={effectiveDir || undefined} />
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "files" ? "hidden" : ""}`}>
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} />
           </div>
       </div>
 

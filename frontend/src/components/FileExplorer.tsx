@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import hljs from "highlight.js";
 import { abbreviateHome } from "../utils/paths";
 import { useResizableSplit } from "../hooks/useResizableSplit";
@@ -10,13 +10,15 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPath?: string | null; onSendInput?: (text: string) => void; cwd?: string }) {
+export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths }: { requestedPath?: string | null; onSendInput?: (text: string) => void; cwd?: string; changedPaths?: string[] }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
   const [wrapLines, setWrapLines] = useState(true);
+  const [changedOnly, setChangedOnly] = useState(false);
+  const changedSet = useMemo(() => new Set(changedPaths ?? []), [changedPaths]);
   const { leftWidth, containerRef: splitContainerRef, onMouseDown: onSplitMouseDown } = useResizableSplit({ defaultWidth: 256 });
 
   useEffect(() => {
@@ -75,6 +77,17 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
           />
           Wrap lines
         </label>
+        {changedPaths && changedPaths.length > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none ml-3">
+            <input
+              type="checkbox"
+              checked={changedOnly}
+              onChange={(e) => setChangedOnly(e.target.checked)}
+              className="accent-blue-500"
+            />
+            Changed only
+          </label>
+        )}
         {cwd && (
           <span className="ml-auto text-[10px] text-gray-600 font-mono truncate max-w-[50%]" title={cwd}>
             {abbreviateHome(cwd)}
@@ -86,7 +99,10 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
         <div className="flex-shrink-0 border-r border-gray-700 overflow-y-auto text-sm" style={{ width: leftWidth }}>
           {tree ? (
             <div className="py-1">
-              {tree.children?.map((node) => (
+              {(changedOnly && changedSet.size > 0
+                ? filterTree(tree, changedSet)?.children ?? []
+                : tree.children ?? []
+              ).map((node) => (
                 <TreeItem
                   key={node.path || node.name}
                   node={node}
@@ -137,6 +153,17 @@ export function FileExplorer({ requestedPath, onSendInput, cwd }: { requestedPat
       </div>
     </div>
   );
+}
+
+function filterTree(node: TreeNode, changedSet: Set<string>): TreeNode | null {
+  if (!node.isDir) {
+    return changedSet.has(node.path) ? node : null;
+  }
+  const filteredChildren = node.children
+    ?.map((child) => filterTree(child, changedSet))
+    .filter((child): child is TreeNode => child !== null);
+  if (!filteredChildren || filteredChildren.length === 0) return null;
+  return { ...node, children: filteredChildren };
 }
 
 function TreeItem({
