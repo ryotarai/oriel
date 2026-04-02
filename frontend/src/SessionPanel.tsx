@@ -217,6 +217,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         term.reset();
         seenUUIDs.current.clear();
         setEntries([]);
+        setSuggestions([]);
+        setSuggestionsLoading(false);
         setWorktreeDir("");
       } else if (msg.type === "worktree_changed" && msg.data) {
         setWorktreeDir(msg.data);
