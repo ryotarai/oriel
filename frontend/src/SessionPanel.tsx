@@ -51,11 +51,12 @@ interface SessionPanelProps {
   swapEnterKeys?: boolean;
   cwd?: string;
   onCwdChange?: (newCwd: string) => void;
+  isFocused?: boolean;
   resumeSessionId?: string; // real Claude CLI session UUID for --resume
   onClaudeSessionId?: (uuid: string) => void;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, cwd, onCwdChange, resumeSessionId, onClaudeSessionId }, ref) {
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, isFocused, cwd, onCwdChange, resumeSessionId, onClaudeSessionId }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -574,7 +575,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.files) setDiffFiles(data.files);
+        setDiffFiles(data?.files ?? []);
       })
       .catch(() => {});
   }, [sessionId, effectiveDir]);

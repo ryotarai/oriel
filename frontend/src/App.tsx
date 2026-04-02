@@ -283,6 +283,7 @@ export default function App() {
                         return { ...tab, splits: next };
                       });
                     }}
+                    isFocused={tab.activePaneIndex === i}
                     swapEnterKeys={appConfig.swapEnterKeys}
                     onCwdChange={(newCwd) => handleCwdChange(pane.id, newCwd)}
                     resumeSessionId={pane.claudeSessionId || undefined}
@@ -336,6 +337,7 @@ interface PaneWithDividerProps {
   onClose: () => void;
   onAdd: () => void;
   onDividerDrag: (posPct: number) => void;
+  isFocused: boolean;
   swapEnterKeys: boolean;
   onCwdChange: (newCwd: string) => void;
   onRef: (handle: SessionPanelHandle | null) => void;
@@ -344,7 +346,7 @@ interface PaneWithDividerProps {
   onClaudeSessionId?: (uuid: string) => void;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, swapEnterKeys, onCwdChange, onRef, onFocus, resumeSessionId, onClaudeSessionId }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, isFocused, swapEnterKeys, onCwdChange, onRef, onFocus, resumeSessionId, onClaudeSessionId }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
   const paneContainerRef = useRef<HTMLDivElement>(null);
   const {
@@ -439,6 +441,7 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           sessionId={pane.sessionId}
           dragHandleProps={{ ...attributes, ...listeners }}
           swapEnterKeys={swapEnterKeys}
+          isFocused={isFocused}
           cwd={pane.cwd}
           onCwdChange={onCwdChange}
           resumeSessionId={resumeSessionId}

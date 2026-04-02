@@ -1,12 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-.pane-running {
-  border-width: 2px;
-  border-color: rgba(59, 130, 246, 0.5);
-  transition: none !important;
-}
-
 .scrollbar-auto-hide {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
