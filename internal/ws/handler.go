@@ -6,10 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 	"github.com/ryotarai/oriel/internal/conversation"
 	"github.com/ryotarai/oriel/internal/diff"
@@ -176,6 +179,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	go h.readPtyLoop(s)
 	go h.watchConversation(s)
+	go h.startFileWatcher(s, ptySess.Done())
 
 	return nil
 }
@@ -382,6 +386,64 @@ func (h *Handler) watchConversation(s *session) {
 			}
 		case <-done:
 			return
+		}
+	}
+}
+
+func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Printf("Session %s: failed to start file watcher: %v", s.id, err)
+		return
+	}
+	defer watcher.Close()
+
+	s.mu.Lock()
+	dir := s.worktreeDir
+	if dir == "" {
+		dir = s.cwd
+	}
+	s.mu.Unlock()
+
+	if err := watcher.Add(dir); err != nil {
+		log.Printf("Session %s: failed to watch %s: %v", s.id, dir, err)
+		return
+	}
+	log.Printf("Session %s: watching %s for file changes", s.id, dir)
+
+	// Also watch .git directory for index/HEAD changes
+	gitDir := filepath.Join(dir, ".git")
+	if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
+		if err := watcher.Add(gitDir); err == nil {
+			log.Printf("Session %s: watching %s for git changes", s.id, gitDir)
+		}
+	}
+
+	var debounceTimer *time.Timer
+
+	for {
+		select {
+		case <-done:
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			return
+		case _, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			// Debounce: reset timer on each event
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(500*time.Millisecond, func() {
+				h.broadcast(s, message{Type: "files_changed"})
+			})
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Printf("Session %s: file watcher error: %v", s.id, err)
 		}
 	}
 }

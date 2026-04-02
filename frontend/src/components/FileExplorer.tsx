@@ -14,7 +14,7 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths }: { requestedPath?: string | null; onSendInput?: (text: string) => void; cwd?: string; changedPaths?: string[] }) {
+export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths, refreshTrigger }: { requestedPath?: string | null; onSendInput?: (text: string) => void; cwd?: string; changedPaths?: string[]; refreshTrigger?: number }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
@@ -27,17 +27,12 @@ export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths }: 
   const { leftWidth, containerRef: splitContainerRef, onMouseDown: onSplitMouseDown } = useResizableSplit({ defaultWidth: 256 });
 
   useEffect(() => {
-    const poll = () => {
-      const cwdParam = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
-      fetch(`/api/files/tree${cwdParam}`)
-        .then((r) => r.json())
-        .then(setTree)
-        .catch(() => {});
-    };
-    poll();
-    const id = setInterval(poll, 3000);
-    return () => clearInterval(id);
-  }, [cwd]);
+    const cwdParam = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
+    fetch(`/api/files/tree${cwdParam}`)
+      .then((r) => r.json())
+      .then(setTree)
+      .catch(() => {});
+  }, [cwd, refreshTrigger]);
 
   // Open file when requested externally
   useEffect(() => {

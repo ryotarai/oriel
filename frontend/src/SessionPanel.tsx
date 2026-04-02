@@ -260,6 +260,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setSuggestionsLoading(false);
         } else if (msg.type === "suggestions_error") {
           setSuggestionsLoading(false);
+        } else if (msg.type === "files_changed") {
+          fetchDiffDataRef.current();
+          setFileRefreshTrigger(c => c + 1);
         }
       };
 
@@ -554,21 +557,26 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
   }, [currentMatchIdx, searchMatches, searchQuery]);
 
-  // Poll diff API
-  useEffect(() => {
-    const poll = () => {
-      const cwdParam = effectiveDir ? `&cwd=${encodeURIComponent(effectiveDir)}` : "";
-      fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (data?.files) setDiffFiles(data.files);
-        })
-        .catch(() => {});
-    };
-    poll();
-    const id = setInterval(poll, 3000);
-    return () => clearInterval(id);
+  // Fetch diff data (called on mount and when files_changed event received via WS)
+  const fetchDiffData = useCallback(() => {
+    const cwdParam = effectiveDir ? `&cwd=${encodeURIComponent(effectiveDir)}` : "";
+    fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.files) setDiffFiles(data.files);
+      })
+      .catch(() => {});
   }, [sessionId, effectiveDir]);
+
+  const fetchDiffDataRef = useRef(fetchDiffData);
+  useEffect(() => { fetchDiffDataRef.current = fetchDiffData; }, [fetchDiffData]);
+
+  // Counter to trigger FileExplorer tree refresh on file changes
+  const [fileRefreshTrigger, setFileRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    fetchDiffData();
+  }, [fetchDiffData]);
 
   const onVDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -804,7 +812,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             <CommitsPanel cwd={effectiveDir || undefined} />
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "files" ? "hidden" : ""}`}>
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} refreshTrigger={fileRefreshTrigger} />
           </div>
       </div>
 
