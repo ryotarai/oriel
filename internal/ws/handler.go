@@ -734,6 +734,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if info, err := os.Stat(newCwd); err == nil && info.IsDir() {
 					s.mu.Lock()
 					s.cwd = newCwd
+					s.claudeSessionID = ""
 					s.mu.Unlock()
 					log.Printf("Session %s: cwd changed to %s", s.id, newCwd)
 					select {
