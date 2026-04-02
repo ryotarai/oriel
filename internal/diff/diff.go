@@ -18,7 +18,7 @@ type FileDiff struct {
 // ComputeDiff returns per-file diffs of uncommitted changes in the working tree.
 // It combines staged and unstaged changes (diff against HEAD) plus untracked files.
 func ComputeDiff(dir string) ([]FileDiff, error) {
-	var files []FileDiff
+	files := []FileDiff{}
 
 	// Check if repo has any commits
 	headCmd := exec.Command("git", "rev-parse", "HEAD")
@@ -123,7 +123,7 @@ func diffNoBase(dir string) ([]FileDiff, error) {
 	if err != nil {
 		return nil, err
 	}
-	var files []FileDiff
+	files := []FileDiff{}
 	for _, path := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		if path == "" {
 			continue

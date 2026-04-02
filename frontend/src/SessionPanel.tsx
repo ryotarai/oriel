@@ -612,7 +612,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   return (
-    <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border ${running ? "pane-running" : "border-transparent transition-colors duration-500"}`}>
+    <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border-2 ${isFocused ? "border-blue-500/50" : "border-transparent transition-colors duration-500"}`}>
       {/* Chat panel (top) */}
       <div
         style={{ height: `${splitPct}%` }}
