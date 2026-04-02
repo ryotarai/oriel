@@ -948,6 +948,16 @@ interface BashParts {
   stderr?: string;
 }
 
+function parseSlashCommand(text: string): { name: string; args: string } | null {
+  const nameMatch = text.match(/<command-name>(.*?)<\/command-name>/);
+  if (!nameMatch) return null;
+  const argsMatch = text.match(/<command-args>(.*?)<\/command-args>/s);
+  return {
+    name: nameMatch[1],
+    args: argsMatch?.[1]?.trim() ?? "",
+  };
+}
+
 function parseBashTags(text: string): BashParts | null {
   const inputMatch = text.match(/<bash-input>([\s\S]*?)<\/bash-input>/);
   const stdoutMatch = text.match(/<bash-stdout>([\s\S]*?)<\/bash-stdout>/);
@@ -1047,6 +1057,21 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
         </div>
       );
     }
+
+    const slashCmd = parseSlashCommand(entry.text);
+    if (slashCmd) {
+      return (
+        <div className="flex justify-start">
+          <div className="inline-flex items-center gap-1 rounded-full bg-gray-800 border border-gray-700 px-3 py-1 text-xs text-gray-400">
+            <span className="font-mono">{slashCmd.name}</span>
+            {slashCmd.args && <span className="text-gray-500">{slashCmd.args}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    // Skip local-command-caveat entries
+    if (entry.text.startsWith("<local-command-caveat>")) return null;
 
     // Skip meta markers like [Request interrupted by user]
     if (/^\[.*\]$/.test(entry.text.trim())) return null;
