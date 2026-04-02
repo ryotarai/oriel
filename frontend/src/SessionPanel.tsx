@@ -213,52 +213,65 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     termRef.current = term;
     fitRef.current = fit;
 
-    const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
-    const resumeParam = resumeSessionId ? `&resume=${encodeURIComponent(resumeSessionId)}` : "";
-    const wsUrl = `ws://${window.location.host}/ws?session=${encodeURIComponent(sessionId)}${cwdParam}${resumeParam}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    let reconnectTimerId: ReturnType<typeof setTimeout> | null = null;
+    let intentionalClose = false;
 
-    ws.onopen = () => {
-      setConnected(true);
-      sendResize(ws, term.cols, term.rows);
-    };
+    function connectWs() {
+      const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
+      const resumeParam = resumeSessionId ? `&resume=${encodeURIComponent(resumeSessionId)}` : "";
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws?session=${encodeURIComponent(sessionId)}${cwdParam}${resumeParam}`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      if (msg.type === "output") {
-        const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
-        term.write(bytes);
-      } else if (msg.type === "conversation_reset") {
-        term.reset();
-        seenUUIDs.current.clear();
-        setEntries([]);
-        setSuggestions([]);
-        setSuggestionsLoading(false);
-        setWorktreeDir("");
-      } else if (msg.type === "worktree_changed") {
-        setWorktreeDir(msg.data || "");
-      } else if (msg.type === "cwd" && msg.data) {
-        onCwdChangeRef.current?.(msg.data);
-      } else if (msg.type === "claude_session_id" && msg.data) {
-        onClaudeSessionIdRef.current?.(msg.data);
-      } else if (msg.type === "conversation" && msg.entry) {
-        const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
-        handleConversation(entry);
-      } else if (msg.type === "suggestions") {
-        try {
-          const parsed = JSON.parse(msg.data);
-          setSuggestions(Array.isArray(parsed) ? parsed : []);
-        } catch (e) {
-          console.warn("Failed to parse suggestions:", e);
+      ws.onopen = () => {
+        setConnected(true);
+        sendResize(ws, term.cols, term.rows);
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "output") {
+          const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
+          term.write(bytes);
+        } else if (msg.type === "conversation_reset") {
+          term.reset();
+          seenUUIDs.current.clear();
+          setEntries([]);
+          setSuggestions([]);
+          setSuggestionsLoading(false);
+          setWorktreeDir("");
+        } else if (msg.type === "worktree_changed") {
+          setWorktreeDir(msg.data || "");
+        } else if (msg.type === "cwd" && msg.data) {
+          onCwdChangeRef.current?.(msg.data);
+        } else if (msg.type === "claude_session_id" && msg.data) {
+          onClaudeSessionIdRef.current?.(msg.data);
+        } else if (msg.type === "conversation" && msg.entry) {
+          const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
+          handleConversation(entry);
+        } else if (msg.type === "suggestions") {
+          try {
+            const parsed = JSON.parse(msg.data);
+            setSuggestions(Array.isArray(parsed) ? parsed : []);
+          } catch (e) {
+            console.warn("Failed to parse suggestions:", e);
+          }
+          setSuggestionsLoading(false);
+        } else if (msg.type === "suggestions_error") {
+          setSuggestionsLoading(false);
         }
-        setSuggestionsLoading(false);
-      } else if (msg.type === "suggestions_error") {
-        setSuggestionsLoading(false);
-      }
-    };
+      };
 
-    ws.onclose = () => setConnected(false);
+      ws.onclose = () => {
+        setConnected(false);
+        if (!intentionalClose) {
+          reconnectTimerId = setTimeout(connectWs, 5000);
+        }
+      };
+    }
+
+    connectWs();
 
     // Plain Enter → Ctrl+J (newline) when swap is enabled, otherwise normal Enter
     term.attachCustomKeyEventHandler((e) => {
@@ -271,8 +284,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         e.preventDefault();
         const bytes = new TextEncoder().encode("\n");
         const base64 = btoa(String.fromCharCode(...bytes));
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "input", data: base64 }));
+        const currentWs = wsRef.current;
+        if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+          currentWs.send(JSON.stringify({ type: "input", data: base64 }));
         }
         return false;
       }
@@ -280,16 +294,18 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     });
 
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      const currentWs = wsRef.current;
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
         const bytes = new TextEncoder().encode(data);
         const base64 = btoa(String.fromCharCode(...bytes));
-        ws.send(JSON.stringify({ type: "input", data: base64 }));
+        currentWs.send(JSON.stringify({ type: "input", data: base64 }));
       }
     });
 
     term.onResize(({ cols, rows }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        sendResize(ws, cols, rows);
+      const currentWs = wsRef.current;
+      if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+        sendResize(currentWs, cols, rows);
       }
     });
 
@@ -297,8 +313,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     observer.observe(containerRef.current);
 
     return () => {
+      intentionalClose = true;
+      if (reconnectTimerId) clearTimeout(reconnectTimerId);
       observer.disconnect();
-      ws.close();
+      wsRef.current?.close();
       term.dispose();
     };
   }, [sessionId, handleConversation]);
@@ -681,7 +699,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           >
             <div className="flex flex-col space-y-3 mt-auto">
               {!connected && (
-                <div className="text-center text-yellow-400 text-sm">Connecting...</div>
+                <div className="text-center text-yellow-400 text-sm">
+                  {entries.length > 0 ? "Reconnecting..." : "Connecting..."}
+                </div>
               )}
               {entries.length === 0 && connected && (
                 <div className="text-gray-600 text-sm text-center mt-4">
