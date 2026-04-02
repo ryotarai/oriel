@@ -405,7 +405,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   // Poll diff API
   useEffect(() => {
     const poll = () => {
-      fetch(`/api/diff?session=${encodeURIComponent(sessionId)}`)
+      const cwdParam = effectiveDir ? `&cwd=${encodeURIComponent(effectiveDir)}` : "";
+      fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           if (data?.files) setDiffFiles(data.files);
@@ -415,7 +416,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     poll();
     const id = setInterval(poll, 3000);
     return () => clearInterval(id);
-  }, [sessionId]);
+  }, [sessionId, effectiveDir]);
 
   const onVDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

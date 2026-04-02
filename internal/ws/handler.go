@@ -442,12 +442,17 @@ func (h *Handler) HandleDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.mu.Lock()
-	dir := s.worktreeDir
+	// Prefer explicit cwd from query param (set by frontend from effectiveDir),
+	// fall back to session state.
+	dir := r.URL.Query().Get("cwd")
 	if dir == "" {
-		dir = s.cwd
+		s.mu.Lock()
+		dir = s.worktreeDir
+		if dir == "" {
+			dir = s.cwd
+		}
+		s.mu.Unlock()
 	}
-	s.mu.Unlock()
 
 	files, err := diff.ComputeDiff(dir)
 	if err != nil {
