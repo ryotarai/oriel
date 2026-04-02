@@ -67,6 +67,9 @@ type session struct {
 	// Worktree directory (set when Claude enters a git worktree); used for diff/files/commits
 	worktreeDir string
 
+	// Notifies file watcher when worktreeDir changes
+	worktreeDirChanged chan string
+
 	// The real Claude CLI session UUID (discovered from ~/.claude/sessions/<pid>.json)
 	claudeSessionID string
 
@@ -130,7 +133,8 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 		cols:      120,
 		rows:      40,
 		cwd:       cwd,
-		restartCh: make(chan restartRequest, 1),
+		restartCh:          make(chan restartRequest, 1),
+		worktreeDirChanged: make(chan string, 1),
 	}
 	h.sessions[id] = s
 
@@ -352,6 +356,11 @@ func (h *Handler) watchConversation(s *session) {
 				s.worktreeDir = ""
 				s.mu.Unlock()
 				h.broadcast(s, message{Type: "worktree_changed", Data: ""})
+				// Notify file watcher to switch back to original cwd
+				select {
+				case s.worktreeDirChanged <- "":
+				default:
+				}
 			}
 			// After EnterWorktree, the tool_result carries the new cwd
 			if pendingEnterWorktreeToolID != "" && entry.Type == "tool_result" && entry.ToolUseID == pendingEnterWorktreeToolID {
@@ -361,6 +370,11 @@ func (h *Handler) watchConversation(s *session) {
 					s.worktreeDir = entry.CWD
 					s.mu.Unlock()
 					h.broadcast(s, message{Type: "worktree_changed", Data: entry.CWD})
+					// Notify file watcher to switch to worktree directory
+					select {
+					case s.worktreeDirChanged <- entry.CWD:
+					default:
+					}
 				}
 				pendingEnterWorktreeToolID = ""
 			}
@@ -420,6 +434,21 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 				debounceTimer.Stop()
 			}
 			return
+		case newDir := <-s.worktreeDirChanged:
+			// Switch watched directory when worktree changes
+			_ = watcher.Remove(dir)
+			targetDir := newDir
+			if targetDir == "" {
+				targetDir = s.cwd
+			}
+			if err := watcher.Add(targetDir); err != nil {
+				log.Printf("Session %s: failed to watch %s: %v", s.id, targetDir, err)
+			} else {
+				dir = targetDir
+				log.Printf("Session %s: switched file watcher to %s", s.id, dir)
+			}
+			// Trigger immediate refresh since directory changed
+			h.broadcast(s, message{Type: "files_changed"})
 		case ev, ok := <-watcher.Events:
 			if !ok {
 				return
