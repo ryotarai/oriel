@@ -11,18 +11,27 @@ Claude Code's terminal is powerful, but sometimes you want more visibility into 
 - **See what changed** -- A live diff viewer shows every file modification as Claude works, with syntax-highlighted unified diffs and line-by-line reference buttons
 - **Run sessions in parallel** -- Split the window into multiple independent Claude Code panes, each with its own terminal and working directory
 - **Pick up where you left off** -- Resume any previous conversation with one click; your tab layout, pane arrangement, and working directories are all persisted across restarts
-- **Read the conversation comfortably** -- Markdown rendering, syntax highlighting, expandable tool-use blocks, and clickable file paths turn the raw JSONL stream into a readable conversation
+- **Read the conversation comfortably** -- Markdown rendering, syntax highlighting, expandable tool-use blocks, inline agent results, and clickable file paths turn the raw JSONL stream into a readable conversation
+- **Keep the momentum going** -- Reply suggestions appear automatically after each response so you can continue the conversation with one click
 - **Browse your project** -- A built-in file explorer and git commit viewer let you navigate code without leaving the browser
 
 ## Features
 
 ### Conversation View
 
-Renders Claude's responses with full markdown, syntax-highlighted code blocks, expandable tool use/result details, and clickable file path links. Select any text and press **r** to insert it as a quoted reply in the terminal.
+Renders Claude's responses with full markdown, syntax-highlighted code blocks, expandable tool use/result details, and clickable file path links. Agent tool results are rendered as full markdown instead of collapsed blocks, so you can read sub-agent output inline. Select any text and press **r** to insert it as a quoted reply in the terminal.
+
+### Reply Suggestions
+
+After Claude finishes responding, Oriel automatically generates a handful of suggested follow-up messages. Click any suggestion to send it instantly -- no typing required. Great for common next steps like requesting tests, commits, or refinements.
+
+### Tabbed Pane Views
+
+Each pane has four switchable tabs -- **Conversation**, **Diff**, **Files**, and **Commits** -- so you can jump between Claude's output, file changes, the project tree, and git history without losing your place. Scroll positions are preserved across tab switches.
 
 ### Diff Viewer
 
-Shows all file changes made during the session with per-file unified diffs and syntax highlighting. Hover over any line to send a reference (`@path:line`) directly to Claude.
+Shows all file changes made during the session with per-file unified diffs and syntax highlighting. The Diff tab badge shows the number of changed files at a glance. Hover over any line to send a reference (`@path:line`) directly to Claude.
 
 ### File Explorer
 
