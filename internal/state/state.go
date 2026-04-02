@@ -100,25 +100,6 @@ func (s *Store) migrate() error {
 	return nil
 }
 
-// GetAuthToken returns the stored auth token, or empty string if none.
-func (s *Store) GetAuthToken() (string, error) {
-	var token string
-	err := s.db.QueryRow("SELECT auth_token FROM config WHERE id = 1").Scan(&token)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return token, err
-}
-
-// SetAuthToken stores the auth token (upsert).
-func (s *Store) SetAuthToken(token string) error {
-	_, err := s.db.Exec(
-		"INSERT INTO config (id, auth_token) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET auth_token = excluded.auth_token",
-		token,
-	)
-	return err
-}
-
 // ListTabs returns all tabs ordered by position.
 func (s *Store) ListTabs() ([]Tab, error) {
 	rows, err := s.db.Query("SELECT id, name, position FROM tabs ORDER BY position")

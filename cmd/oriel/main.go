@@ -39,7 +39,7 @@ func main() {
 	}
 	defer store.Close()
 
-	token := auth.LoadOrGenerateToken(store)
+	token := auth.GenerateToken()
 
 	handler := ws.NewHandler(*command, store)
 

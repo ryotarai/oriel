@@ -3,39 +3,19 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"log"
 	"net/http"
 	"time"
-
-	"github.com/ryotarai/oriel/internal/state"
 )
 
 const cookieName = "oriel-token"
 
-// generateToken returns a cryptographically random hex token.
-func generateToken() string {
+// GenerateToken returns a cryptographically random hex token.
+func GenerateToken() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
 	return hex.EncodeToString(b)
-}
-
-// LoadOrGenerateToken loads the auth token from the store, or generates a new
-// one and saves it.
-func LoadOrGenerateToken(store *state.Store) string {
-	token, err := store.GetAuthToken()
-	if err != nil {
-		log.Printf("Failed to load auth token: %v, generating new one", err)
-	}
-	if token != "" {
-		return token
-	}
-	token = generateToken()
-	if err := store.SetAuthToken(token); err != nil {
-		log.Printf("Failed to save auth token: %v", err)
-	}
-	return token
 }
 
 // Middleware returns an http.Handler that checks for a valid token in the
