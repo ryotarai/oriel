@@ -57,6 +57,7 @@ type ConversationEntry struct {
 	UUID       string `json:"uuid"`
 	CWD        string `json:"cwd,omitempty"`
 	Text       string `json:"text"`
+	Timestamp  string `json:"timestamp,omitempty"`
 	IsThinking bool   `json:"isThinking,omitempty"`
 	// Tool use fields
 	ToolName  string `json:"toolName,omitempty"`
@@ -274,11 +275,12 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 			return nil
 		}
 		return []ConversationEntry{{
-			Type: msg.Type,
-			Role: msg.Type,
-			UUID: msg.UUID,
-			CWD:  msg.CWD,
-			Text: str,
+			Type:      msg.Type,
+			Role:      msg.Type,
+			UUID:      msg.UUID,
+			CWD:       msg.CWD,
+			Text:      str,
+			Timestamp: msg.Timestamp,
 		}}
 	}
 
@@ -305,11 +307,12 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				continue
 			}
 			entries = append(entries, ConversationEntry{
-				Type: msg.Type,
-				Role: msg.Type,
-				UUID: uuid,
-				CWD:  msg.CWD,
-				Text: block.Text,
+				Type:      msg.Type,
+				Role:      msg.Type,
+				UUID:      uuid,
+				CWD:       msg.CWD,
+				Text:      block.Text,
+				Timestamp: msg.Timestamp,
 			})
 		case "thinking":
 			text := block.Thinking
@@ -325,6 +328,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				UUID:       uuid,
 				CWD:        msg.CWD,
 				Text:       text,
+				Timestamp:  msg.Timestamp,
 				IsThinking: true,
 			})
 		case "tool_use":
@@ -337,6 +341,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				Role:      msg.Type,
 				UUID:      uuid,
 				CWD:       msg.CWD,
+				Timestamp: msg.Timestamp,
 				ToolName:  block.Name,
 				ToolInput: inputStr,
 				ToolUseID: block.ID,
@@ -348,6 +353,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				Role:      msg.Type,
 				UUID:      uuid,
 				CWD:       msg.CWD,
+				Timestamp: msg.Timestamp,
 				Text:      text,
 				ToolUseID: block.ToolUseID,
 				IsError:   block.IsError,
@@ -395,10 +401,11 @@ func parseTaskNotification(msg Message) []ConversationEntry {
 	}
 
 	return []ConversationEntry{{
-		Type: "assistant",
-		Role: "assistant",
-		UUID: msg.UUID,
-		Text: text,
+		Type:      "assistant",
+		Role:      "assistant",
+		UUID:      msg.UUID,
+		Timestamp: msg.Timestamp,
+		Text:      text,
 	}}
 }
 

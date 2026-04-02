@@ -15,6 +15,7 @@ interface ConversationEntry {
   role: string;
   uuid: string;
   text: string;
+  timestamp?: string;
   isThinking?: boolean;
   toolName?: string;
   toolInput?: string;
@@ -667,7 +668,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   }
                 }
                 return true;
-              }).map((entry) => {
+              }).map((entry, idx, arr) => {
                 // Render Agent tool results as assistant messages (markdown)
                 const isAgentResult = entry.type === "tool_result" && (() => {
                   const matchingUse = entries.find(
@@ -677,16 +678,24 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 })();
                 const isCurrentSearchMatch = searchQuery && searchMatches[currentMatchIdx]?.uuid === entry.uuid;
                 const isAnySearchMatch = searchQuery && entry.text?.toLowerCase().includes(searchQuery.toLowerCase());
+                const prevTimestamp = idx > 0 ? arr[idx - 1].timestamp : undefined;
+                const showTs = shouldShowTimestamp(prevTimestamp, entry.timestamp);
                 return (
-                  <div
-                    key={entry.uuid}
-                    id={`msg-${entry.uuid}`}
-                    className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
-                  >
-                    <MessageBubble
-                      entry={isAgentResult ? { ...entry, type: "assistant", role: "assistant" } : entry}
-                      onOpenFile={openFileInExplorer}
-                    />
+                  <div key={entry.uuid}>
+                    {showTs && entry.timestamp && (
+                      <div className="text-center text-[10px] text-gray-600 py-1">
+                        {formatTimestamp(entry.timestamp)}
+                      </div>
+                    )}
+                    <div
+                      id={`msg-${entry.uuid}`}
+                      className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
+                    >
+                      <MessageBubble
+                        entry={isAgentResult ? { ...entry, type: "assistant", role: "assistant" } : entry}
+                        onOpenFile={openFileInExplorer}
+                      />
+                    </div>
                   </div>
                 );
               })}
@@ -922,6 +931,27 @@ function BashBlock({ parts }: { parts: BashParts }) {
       )}
     </div>
   );
+}
+
+function formatTimestamp(ts: string): string {
+  const date = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24 && date.getDate() === now.getDate()) {
+    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ", " + date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function shouldShowTimestamp(prev: string | undefined, curr: string | undefined): boolean {
+  if (!curr) return false;
+  if (!prev) return true;
+  const diff = new Date(curr).getTime() - new Date(prev).getTime();
+  return diff > 5 * 60 * 1000; // 5 minutes
 }
 
 function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
