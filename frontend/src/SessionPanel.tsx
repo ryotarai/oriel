@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
+import { MermaidBlock } from "./components/MermaidBlock";
 import { DiffPanel, type FileDiffData } from "./components/DiffPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { CommitsPanel } from "./components/CommitsPanel";
@@ -1151,6 +1152,11 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
               );
             },
             code: ({ children, className, ...props }) => {
+              // Render mermaid diagrams
+              if (className === "language-mermaid") {
+                const chart = typeof children === "string" ? children : String(children ?? "");
+                return <MermaidBlock chart={chart.trim()} />;
+              }
               // For code blocks (has language class), use default rendering
               if (className) {
                 return <code className={className} {...props}>{children}</code>;

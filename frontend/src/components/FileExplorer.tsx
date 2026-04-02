@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { abbreviateHome } from "../utils/paths";
+import { MermaidBlock } from "./MermaidBlock";
 import { useResizableSplit } from "../hooks/useResizableSplit";
 
 interface TreeNode {
@@ -184,7 +185,19 @@ function RenderedMarkdown({ content }: { content: string }) {
       prose-a:text-blue-400
       prose-strong:text-gray-100
     ">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          code: ({ children, className, ...props }) => {
+            if (className === "language-mermaid") {
+              const chart = typeof children === "string" ? children : String(children ?? "");
+              return <MermaidBlock chart={chart.trim()} />;
+            }
+            return <code className={className} {...props}>{children}</code>;
+          },
+        }}
+      >
         {content}
       </ReactMarkdown>
     </div>
