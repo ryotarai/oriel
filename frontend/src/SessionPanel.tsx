@@ -397,7 +397,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       setRunning(false);
       return;
     }
-    const last = entries[entries.length - 1];
+    // Find the last entry that is not a local command (!command)
+    let last = entries[entries.length - 1];
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (!isLocalCommand(entries[i])) {
+        last = entries[i];
+        break;
+      }
+    }
     // Claude is done when the last entry is assistant text (final response).
     // Otherwise (tool_use, tool_result, user input), Claude is actively working.
     setRunning(last.type !== "assistant");
@@ -984,6 +991,19 @@ function formatTimestamp(ts: string): string {
     return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ", " + date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** Returns true if this user entry is a local !command execution, not a real user prompt. */
+function isLocalCommand(entry: ConversationEntry): boolean {
+  if (entry.role !== "user") return false;
+  const t = entry.text;
+  return (
+    t.startsWith("<bash-input>") ||
+    t.startsWith("<bash-stdout>") ||
+    t.startsWith("<bash-stderr>") ||
+    t.startsWith("<local-command-caveat>") ||
+    t.startsWith("<local-command-stdout>")
+  );
 }
 
 function shouldShowTimestamp(prev: string | undefined, curr: string | undefined): boolean {
