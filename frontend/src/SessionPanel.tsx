@@ -235,8 +235,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         setSuggestions([]);
         setSuggestionsLoading(false);
         setWorktreeDir("");
-      } else if (msg.type === "worktree_changed" && msg.data) {
-        setWorktreeDir(msg.data);
+      } else if (msg.type === "worktree_changed") {
+        setWorktreeDir(msg.data || "");
       } else if (msg.type === "cwd" && msg.data) {
         onCwdChangeRef.current?.(msg.data);
       } else if (msg.type === "claude_session_id" && msg.data) {
