@@ -552,7 +552,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             </div>
             <div
               ref={chatScrollRef}
-              className="flex-1 overflow-y-auto p-3 space-y-3 flex flex-col min-h-0 cursor-text"
+              className="flex-1 overflow-y-auto scrollbar-auto-hide p-3 space-y-3 flex flex-col min-h-0 cursor-text"
             onClick={() => {
               const sel = window.getSelection();
               if (sel && sel.toString().length > 0) return;
