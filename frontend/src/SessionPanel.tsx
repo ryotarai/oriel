@@ -535,9 +535,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           </button>
         </div>
 
-        {/* Tab content */}
-        {activeTab === "conversation" ? (
-          <div className="flex-1 flex flex-col min-h-0 relative">
+        {/* Tab content - all tabs always mounted, hidden when inactive */}
+        <div className={`flex-1 flex flex-col min-h-0 relative ${activeTab !== "conversation" ? "hidden" : ""}`}>
             <TaskOverlay tasks={tasks} />
             <div className="flex items-center px-3 py-1 border-b border-gray-800">
               <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
@@ -618,19 +617,15 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             </div>
           </div>
           </div>
-        ) : activeTab === "diff" ? (
-          <div className="flex-1 flex flex-col min-h-0">
+        <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "diff" ? "hidden" : ""}`}>
             <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
           </div>
-        ) : activeTab === "commits" ? (
-          <div className="flex-1 flex flex-col min-h-0">
+        <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "commits" ? "hidden" : ""}`}>
             <CommitsPanel cwd={effectiveDir || undefined} />
           </div>
-        ) : (
-          <div className="flex-1 flex flex-col min-h-0">
+        <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "files" ? "hidden" : ""}`}>
             <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
           </div>
-        )}
       </div>
 
       {/* Vertical drag handle */}
