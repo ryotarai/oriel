@@ -28,7 +28,9 @@ var (
 	ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[>\[?][0-9;]*[a-zA-Z]`)
 )
 
-const appendSystemPrompt = `When creating or entering a git worktree, you MUST use the EnterWorktree tool. When leaving a git worktree, you MUST use the ExitWorktree tool. NEVER use raw "git worktree add" + "cd" commands manually. This is critical for the UI to track your working directory correctly.`
+const appendSystemPrompt = `<critical_rules>
+When creating or entering a git worktree, you MUST use the EnterWorktree tool. When leaving a git worktree, you MUST use the ExitWorktree tool. NEVER use raw "git worktree add" + "cd" commands manually. This is critical for the UI to track your working directory correctly.
+</critical_rules>`
 
 type message struct {
 	Type  string          `json:"type"`
