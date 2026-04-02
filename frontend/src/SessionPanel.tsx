@@ -198,7 +198,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     if (!containerRef.current) return;
 
     const term = new Terminal({
-      cursorBlink: true,
+      cursorBlink: false,
       fontSize: 12,
       fontFamily: "Menlo, Monaco, 'Courier New', monospace",
       theme: {
@@ -268,6 +268,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
       ws.onclose = () => {
         setConnected(false);
+        setSuggestionsLoading(false);
         if (!intentionalClose) {
           reconnectTimerId = setTimeout(connectWs, 5000);
         }
@@ -310,6 +311,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (currentWs && currentWs.readyState === WebSocket.OPEN) {
         sendResize(currentWs, cols, rows);
       }
+    });
+
+    // Enable cursor blink only when terminal is focused
+    term.textarea?.addEventListener("focus", () => {
+      term.options.cursorBlink = true;
+    });
+    term.textarea?.addEventListener("blur", () => {
+      term.options.cursorBlink = false;
     });
 
     const observer = new ResizeObserver(() => fit.fit());
@@ -449,6 +458,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setSuggestions([]);
           setSuggestionsLoading(true);
           ws.send(JSON.stringify({ type: "request_suggestions" }));
+          // Safety timeout: stop spinner after 30s if no response
+          setTimeout(() => setSuggestionsLoading(false), 30000);
         }
 
         // Send desktop notification when not focused
@@ -600,7 +611,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   return (
-    <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border ${running ? "pane-running" : "border-transparent"} transition-colors duration-500`}>
+    <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border ${running ? "pane-running" : "border-transparent transition-colors duration-500"}`}>
       {/* Chat panel (top) */}
       <div
         style={{ height: `${splitPct}%` }}
