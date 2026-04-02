@@ -24,8 +24,8 @@ const suggestionsJSONSchema = `{"type":"object","properties":{"suggestions":{"ty
 const suggestionsPrompt = "Based on the conversation so far, suggest 3-5 possible next messages the user might want to send. Focus on natural follow-up actions like asking for refinements, requesting tests, committing changes, or exploring related topics. Keep labels short and messages actionable. Return ONLY the JSON."
 
 // generateSuggestions calls claude CLI to generate reply suggestions for a session.
-func (h *Handler) generateSuggestions(claudeSessionID string) ([]suggestion, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+func (h *Handler) generateSuggestions(claudeSessionID string, cwd string) ([]suggestion, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, h.command,
@@ -37,6 +37,10 @@ func (h *Handler) generateSuggestions(claudeSessionID string) ([]suggestion, err
 		"--no-session-persistence",
 		suggestionsPrompt,
 	)
+
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
 
 	log.Printf("Generating suggestions for session %s", claudeSessionID)
 

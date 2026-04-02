@@ -770,13 +770,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case "request_suggestions":
 			s.mu.Lock()
 			claudeSessionID := s.claudeSessionID
+			sessionCwd := s.cwd
 			s.mu.Unlock()
 			if claudeSessionID == "" {
 				sub.writeJSON(message{Type: "suggestions_error", Data: "no session ID"})
 				continue
 			}
 			go func() {
-				suggestions, err := h.generateSuggestions(claudeSessionID)
+				suggestions, err := h.generateSuggestions(claudeSessionID, sessionCwd)
 				if err != nil {
 					log.Printf("Session %s: suggestions failed: %v", s.id, err)
 					sub.writeJSON(message{Type: "suggestions_error", Data: err.Error()})
