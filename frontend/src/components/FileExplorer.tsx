@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import hljs from "highlight.js";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import { abbreviateHome } from "../utils/paths";
 import { useResizableSplit } from "../hooks/useResizableSplit";
 
@@ -17,6 +20,7 @@ export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths }: 
   const [isBinary, setIsBinary] = useState(false);
   const [loading, setLoading] = useState(false);
   const [wrapLines, setWrapLines] = useState(true);
+  const [renderMarkdown, setRenderMarkdown] = useState(true);
   const [changedOnly, setChangedOnly] = useState(false);
   const changedSet = useMemo(() => new Set(changedPaths ?? []), [changedPaths]);
   const { leftWidth, containerRef: splitContainerRef, onMouseDown: onSplitMouseDown } = useResizableSplit({ defaultWidth: 256 });
@@ -130,14 +134,24 @@ export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths }: 
               <div className="text-gray-500 text-sm p-4">Loading...</div>
             ) : (
               <div className="flex flex-col h-full">
-                <div className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/50">
-                  {selectedPath}
+                <div className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/50 flex items-center">
+                  <span className="truncate">{selectedPath}</span>
+                  {isMarkdownFile(selectedPath) && (
+                    <button
+                      onClick={() => setRenderMarkdown(!renderMarkdown)}
+                      className="ml-auto flex-shrink-0 text-xs text-gray-500 hover:text-gray-300 px-2 py-0.5 rounded border border-gray-700 hover:border-gray-600"
+                    >
+                      {renderMarkdown ? "Raw" : "Preview"}
+                    </button>
+                  )}
                 </div>
                 <div className="flex-1 overflow-auto">
                   {isBinary ? (
                     <div className="text-gray-500 text-sm p-4 flex items-center justify-center h-full">
                       Binary file
                     </div>
+                  ) : isMarkdownFile(selectedPath) && renderMarkdown ? (
+                    <RenderedMarkdown content={fileContent ?? ""} />
                   ) : (
                     <HighlightedCode content={fileContent ?? ""} path={selectedPath} onSendInput={onSendInput} wrapLines={wrapLines} />
                   )}
@@ -151,6 +165,28 @@ export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths }: 
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function isMarkdownFile(path: string): boolean {
+  return /\.md$/i.test(path);
+}
+
+function RenderedMarkdown({ content }: { content: string }) {
+  return (
+    <div className="prose prose-invert prose-sm max-w-none p-4
+      prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
+      prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
+      prose-li:text-gray-200 prose-li:my-0
+      prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
+      prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
+      prose-a:text-blue-400
+      prose-strong:text-gray-100
+    ">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
