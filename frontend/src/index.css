@@ -2,13 +2,14 @@
 @plugin "@tailwindcss/typography";
 
 @keyframes pane-pulse {
-  0%, 100% { border-color: rgba(59, 130, 246, 0.8); box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.25); }
-  50% { border-color: rgba(59, 130, 246, 0.25); box-shadow: inset 0 0 4px rgba(59, 130, 246, 0.08); }
+  0%, 100% { border-color: rgba(59, 130, 246, 0.7); }
+  50% { border-color: rgba(59, 130, 246, 0.2); }
 }
 
 .pane-running {
-  animation: pane-pulse 1.5s ease-in-out infinite;
+  animation: pane-pulse 2s ease-in-out infinite;
   border-width: 2px;
+  will-change: border-color;
 }
 
 .scrollbar-auto-hide {
