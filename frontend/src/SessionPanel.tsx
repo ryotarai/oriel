@@ -1065,8 +1065,22 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
           components={{
-            a: ({ children, ...props }) => (
-              <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>
+            a: ({ children, href, ...props }) => (
+              <a
+                {...props}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (href) {
+                    e.preventDefault();
+                    window.open(href, "_blank", "noopener,noreferrer");
+                  }
+                }}
+              >
+                {children}
+              </a>
             ),
             pre: ({ children, ...props }) => {
               const extractText = (node: React.ReactNode): string => {
