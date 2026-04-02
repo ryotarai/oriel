@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 
@@ -28,6 +30,24 @@ func main() {
 	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
 	stateDB := flag.String("state-db", "", "Path to state database (default: ~/.config/oriel/state.sqlite3)")
 	flag.Parse()
+
+	// Set up debug log file
+	if home, err := os.UserHomeDir(); err == nil {
+		logDir := filepath.Join(home, ".local", "oriel")
+		os.MkdirAll(logDir, 0o755)
+		logPath := filepath.Join(logDir, "debug.log")
+		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			log.Printf("Warning: could not open debug log %s: %v", logPath, err)
+		} else {
+			defer logFile.Close()
+			// Ensure file permissions are correct even if file already existed
+			os.Chmod(logPath, 0o600)
+			// Write to both stderr and the log file
+			log.SetOutput(io.MultiWriter(os.Stderr, logFile))
+			log.Printf("Debug log: %s", logPath)
+		}
+	}
 
 	dbPath := *stateDB
 	if dbPath == "" {
@@ -66,7 +86,7 @@ func main() {
 
 	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)
 	log.Printf("Listening on %s", *listenAddr)
-	log.Printf("Open %s", url)
+	fmt.Fprintf(os.Stderr, "Open %s\n", url)
 
 	go func() {
 		if err := http.ListenAndServe(*listenAddr, auth.Middleware(token, mux)); err != nil {
