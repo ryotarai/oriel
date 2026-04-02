@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from "react";
+import { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -97,6 +97,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [running, setRunning] = useState(false);
   const [suggestions, setSuggestions] = useState<{ label: string; message: string }[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMatchIdx, setSearchMatchIdx] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveDir = worktreeDir || cwd || "";
 
@@ -441,6 +446,48 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Ctrl+F / Cmd+F search shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        if (activeTab !== "conversation") return;
+        if (!panelRef.current?.contains(document.activeElement) && document.activeElement !== document.body) return;
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab]);
+
+  // Search match computation
+  const searchMatches = useMemo(() => {
+    if (!searchQuery) return [];
+    const q = searchQuery.toLowerCase();
+    const matches: { entryIdx: number; uuid: string }[] = [];
+    entries.forEach((entry, i) => {
+      if (entry.text?.toLowerCase().includes(q)) {
+        matches.push({ entryIdx: i, uuid: entry.uuid });
+      }
+    });
+    return matches;
+  }, [entries, searchQuery]);
+
+  const totalMatches = searchMatches.length;
+  const currentMatchIdx = totalMatches > 0 ? ((searchMatchIdx % totalMatches) + totalMatches) % totalMatches : 0;
+
+  // Scroll to current search match
+  useEffect(() => {
+    if (!searchQuery || searchMatches.length === 0) return;
+    const match = searchMatches[currentMatchIdx];
+    if (!match) return;
+    const el = document.getElementById(`msg-${match.uuid}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [currentMatchIdx, searchMatches, searchQuery]);
+
   // Poll diff API
   useEffect(() => {
     const poll = () => {
@@ -551,6 +598,30 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 Show tools
               </label>
             </div>
+            {searchOpen && (
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-800 bg-gray-900/80">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIdx(0); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); }
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); setSearchMatchIdx(i => i + 1); }
+                    if (e.key === "Enter" && e.shiftKey) { e.preventDefault(); setSearchMatchIdx(i => Math.max(0, i - 1)); }
+                  }}
+                  placeholder="Search..."
+                  className="flex-1 bg-gray-800 text-gray-200 text-xs px-2 py-1 rounded border border-gray-700 outline-none focus:border-blue-500"
+                  autoFocus
+                />
+                <span className="text-xs text-gray-500 min-w-[3rem] text-center">
+                  {searchQuery ? `${totalMatches > 0 ? currentMatchIdx + 1 : 0}/${totalMatches}` : ""}
+                </span>
+                <button onClick={() => setSearchMatchIdx(i => Math.max(0, i - 1))} className="text-gray-400 hover:text-gray-200 text-xs px-1">&#9650;</button>
+                <button onClick={() => setSearchMatchIdx(i => i + 1)} className="text-gray-400 hover:text-gray-200 text-xs px-1">&#9660;</button>
+                <button onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="text-gray-400 hover:text-gray-200 text-xs px-1">&#10005;</button>
+              </div>
+            )}
             <div
               ref={chatScrollRef}
               className="flex-1 overflow-y-auto scrollbar-auto-hide p-3 space-y-3 flex flex-col min-h-0 cursor-text"
@@ -604,12 +675,19 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   );
                   return matchingUse?.toolName === "Agent";
                 })();
+                const isCurrentSearchMatch = searchQuery && searchMatches[currentMatchIdx]?.uuid === entry.uuid;
+                const isAnySearchMatch = searchQuery && entry.text?.toLowerCase().includes(searchQuery.toLowerCase());
                 return (
-                  <MessageBubble
+                  <div
                     key={entry.uuid}
-                    entry={isAgentResult ? { ...entry, type: "assistant", role: "assistant" } : entry}
-                    onOpenFile={openFileInExplorer}
-                  />
+                    id={`msg-${entry.uuid}`}
+                    className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
+                  >
+                    <MessageBubble
+                      entry={isAgentResult ? { ...entry, type: "assistant", role: "assistant" } : entry}
+                      onOpenFile={openFileInExplorer}
+                    />
+                  </div>
                 );
               })}
               <div ref={chatEndRef} />
