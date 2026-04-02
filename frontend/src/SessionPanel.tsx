@@ -1181,7 +1181,7 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
             },
             code: ({ children, className, ...props }) => {
               // Render mermaid diagrams
-              if (className === "language-mermaid") {
+              if (className?.includes("language-mermaid")) {
                 const chart = typeof children === "string" ? children : String(children ?? "");
                 return <MermaidBlock chart={chart.trim()} />;
               }

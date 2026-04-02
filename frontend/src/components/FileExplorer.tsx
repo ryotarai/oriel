@@ -185,7 +185,7 @@ function RenderedMarkdown({ content }: { content: string }) {
         rehypePlugins={[rehypeHighlight]}
         components={{
           code: ({ children, className, ...props }) => {
-            if (className === "language-mermaid") {
+            if (className?.includes("language-mermaid")) {
               const chart = typeof children === "string" ? children : String(children ?? "");
               return <MermaidBlock chart={chart.trim()} />;
             }
