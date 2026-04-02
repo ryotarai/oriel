@@ -956,49 +956,84 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
   }
 
   return (
-    <div className="prose prose-invert prose-sm max-w-none
-      prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
-      prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
-      prose-li:text-gray-200 prose-li:my-0
-      prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
-      prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
-      prose-a:text-blue-400
-      prose-strong:text-gray-100
-    ">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          a: ({ children, ...props }) => (
-            <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>
-          ),
-          code: ({ children, className, ...props }) => {
-            // For code blocks (has language class), use default rendering
-            if (className) {
-              return <code className={className} {...props}>{children}</code>;
-            }
-            // For inline code, check if it looks like a file path
-            const text = typeof children === "string" ? children : String(children ?? "");
-            if (onOpenFile && isFilePath(text)) {
-              // Strip line number suffix like :42
-              const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
-              return (
-                <code
-                  className="cursor-pointer hover:underline hover:text-blue-300"
-                  onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
-                  title="Open in File Explorer"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-            return <code {...props}>{children}</code>;
-          },
-        }}
+    <div className="relative group">
+      <button
+        onClick={() => navigator.clipboard.writeText(entry.text)}
+        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-300 p-1"
+        title="Copy message"
       >
-        {entry.text}
-      </ReactMarkdown>
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeWidth="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2"/>
+        </svg>
+      </button>
+      <div className="prose prose-invert prose-sm max-w-none
+        prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
+        prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
+        prose-li:text-gray-200 prose-li:my-0
+        prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
+        prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
+        prose-a:text-blue-400
+        prose-strong:text-gray-100
+      ">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeHighlight]}
+          components={{
+            a: ({ children, ...props }) => (
+              <a {...props} target="_blank" rel="noopener noreferrer">{children}</a>
+            ),
+            pre: ({ children, ...props }) => {
+              const extractText = (node: React.ReactNode): string => {
+                if (typeof node === "string") return node;
+                if (Array.isArray(node)) return node.map(extractText).join("");
+                if (node && typeof node === "object" && "props" in node) {
+                  return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+                }
+                return "";
+              };
+              const text = extractText(children);
+              return (
+                <div className="relative group/code">
+                  <button
+                    onClick={() => navigator.clipboard.writeText(text)}
+                    className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
+                    title="Copy code"
+                  >
+                    Copy
+                  </button>
+                  <pre {...props}>{children}</pre>
+                </div>
+              );
+            },
+            code: ({ children, className, ...props }) => {
+              // For code blocks (has language class), use default rendering
+              if (className) {
+                return <code className={className} {...props}>{children}</code>;
+              }
+              // For inline code, check if it looks like a file path
+              const text = typeof children === "string" ? children : String(children ?? "");
+              if (onOpenFile && isFilePath(text)) {
+                // Strip line number suffix like :42
+                const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
+                return (
+                  <code
+                    className="cursor-pointer hover:underline hover:text-blue-300"
+                    onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+                    title="Open in File Explorer"
+                    {...props}
+                  >
+                    {children}
+                  </code>
+                );
+              }
+              return <code {...props}>{children}</code>;
+            },
+          }}
+        >
+          {entry.text}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }
