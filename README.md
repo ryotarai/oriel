@@ -4,16 +4,40 @@ A rich web UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 <!-- TODO: Add screenshot -->
 
-## Why Oriel?
+## Highlights
 
-Claude Code's terminal is powerful, but sometimes you want more visibility into what's happening. Oriel wraps the CLI and adds the tools you wish the terminal had:
+- **Live diff viewer** -- See every file change as Claude works, with syntax highlighting and line-by-line references
+- **Parallel sessions** -- Run multiple Claude Code panes side by side, each with its own terminal and working directory
+- **Reply suggestions** -- One-click follow-up suggestions appear after each response
+- **Session resume** -- Pick up any previous conversation with one click; layout and context are fully restored
+- **Readable conversation** -- Markdown rendering, inline agent results, syntax highlighting, and clickable file paths
+- **File explorer & commit history** -- Browse code and review git commits without leaving the browser
 
-- **See what changed** -- A live diff viewer shows every file modification as Claude works, with syntax-highlighted unified diffs and line-by-line reference buttons
-- **Run sessions in parallel** -- Split the window into multiple independent Claude Code panes, each with its own terminal and working directory
-- **Pick up where you left off** -- Resume any previous conversation with one click; your tab layout, pane arrangement, and working directories are all persisted across restarts
-- **Read the conversation comfortably** -- Markdown rendering, syntax highlighting, expandable tool-use blocks, inline agent results, and clickable file paths turn the raw JSONL stream into a readable conversation
-- **Keep the momentum going** -- Reply suggestions appear automatically after each response so you can continue the conversation with one click
-- **Browse your project** -- A built-in file explorer and git commit viewer let you navigate code without leaving the browser
+## Quick Start
+
+### Install
+
+Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page, or build from source:
+
+```bash
+git clone https://github.com/ryotarai/oriel.git
+cd oriel
+make build        # requires Go 1.24+ and Node.js 18+
+# produces ./bin/oriel
+```
+
+**Prerequisite:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and available as `claude` in your PATH.
+
+### Run
+
+```bash
+cd /path/to/your/project
+oriel
+```
+
+The server starts, prints a URL with an auth token, and opens your browser automatically.
+
+---
 
 ## Features
 
@@ -68,36 +92,7 @@ Each pane can target a different project directory. Click the folder icon in the
 
 > Enter/Cmd+Enter behavior can be swapped in Settings.
 
-## Installation
-
-Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page and place it somewhere in your PATH.
-
-### Prerequisites
-
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and available as `claude` in your PATH
-
-### Build from source
-
-Requires [Go](https://go.dev/) 1.24+ and [Node.js](https://nodejs.org/) 18+.
-
-```bash
-git clone https://github.com/ryotarai/oriel.git
-cd oriel
-make build
-```
-
-This produces a single binary at `./bin/oriel` with the frontend assets embedded.
-
-## Usage
-
-```bash
-cd /path/to/your/project
-oriel
-```
-
-The server starts, prints a URL with an auth token, and opens your browser automatically.
-
-### Options
+## CLI Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -105,8 +100,6 @@ The server starts, prints a URL with an auth token, and opens your browser autom
 | `-command` | `claude` | CLI command to run in the terminal |
 | `-no-open` | `false` | Don't auto-open the browser on startup |
 | `-state-db` | `~/.config/oriel/state.sqlite3` | Path to the SQLite state database |
-
-### Examples
 
 ```bash
 # Listen on a different port
