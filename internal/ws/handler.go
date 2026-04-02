@@ -26,11 +26,9 @@ var (
 	clearPattern = regexp.MustCompile(`\(no content\)`)
 	// Strip ANSI escape sequences for pattern matching
 	ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[>\[?][0-9;]*[a-zA-Z]`)
-	// Detect working directory change (e.g. git worktree)
-	worktreePattern = regexp.MustCompile(`<new_working_directory>(.*?)</new_working_directory>`)
 )
 
-const appendSystemPrompt = `When you enter a git worktree or change your effective working directory (e.g., via EnterWorktree), output this tag so the UI can track it: <new_working_directory>/absolute/path</new_working_directory>`
+const appendSystemPrompt = `When creating or entering a git worktree, you MUST use the EnterWorktree tool. When leaving a git worktree, you MUST use the ExitWorktree tool. NEVER use raw "git worktree add" + "cd" commands manually. This is critical for the UI to track your working directory correctly.`
 
 type message struct {
 	Type  string          `json:"type"`
@@ -285,16 +283,6 @@ func (h *Handler) readPtyLoop(s *session) {
 		}
 
 
-		// Detect working directory change (git worktree)
-		if m := worktreePattern.FindStringSubmatch(text); m != nil {
-			newDir := strings.TrimSpace(m[1])
-			log.Printf("Session %s: worktree changed to %s", s.id, newDir)
-			s.mu.Lock()
-			s.worktreeDir = newDir
-			s.mu.Unlock()
-			h.broadcast(s, message{Type: "worktree_changed", Data: newDir})
-		}
-
 		// Keep buffer bounded — only need last ~200 bytes for pattern matching
 		if detectBuf.Len() > 500 {
 			recent := text[len(text)-200:]
@@ -322,6 +310,10 @@ func (h *Handler) watchConversation(s *session) {
 	}, resumeID)
 
 	uuidBroadcast := false
+	// Track pending EnterWorktree tool call ID to detect the corresponding
+	// cwd change in subsequent entries (the tool_result after EnterWorktree
+	// will carry the new worktree path in its cwd field).
+	var pendingEnterWorktreeToolID string
 
 	for {
 		select {
@@ -336,6 +328,31 @@ func (h *Handler) watchConversation(s *session) {
 				h.broadcast(s, message{Type: "conversation_reset"})
 				continue
 			}
+
+			// Detect EnterWorktree/ExitWorktree tool calls
+			if entry.Type == "tool_use" && entry.ToolName == "EnterWorktree" {
+				log.Printf("Session %s: detected EnterWorktree tool call (id=%s)", s.id, entry.ToolUseID)
+				pendingEnterWorktreeToolID = entry.ToolUseID
+			}
+			if entry.Type == "tool_use" && entry.ToolName == "ExitWorktree" {
+				log.Printf("Session %s: detected ExitWorktree tool call", s.id)
+				s.mu.Lock()
+				s.worktreeDir = ""
+				s.mu.Unlock()
+				h.broadcast(s, message{Type: "worktree_changed", Data: ""})
+			}
+			// After EnterWorktree, the tool_result carries the new cwd
+			if pendingEnterWorktreeToolID != "" && entry.Type == "tool_result" && entry.ToolUseID == pendingEnterWorktreeToolID {
+				if entry.CWD != "" {
+					log.Printf("Session %s: worktree entered: %s", s.id, entry.CWD)
+					s.mu.Lock()
+					s.worktreeDir = entry.CWD
+					s.mu.Unlock()
+					h.broadcast(s, message{Type: "worktree_changed", Data: entry.CWD})
+				}
+				pendingEnterWorktreeToolID = ""
+			}
+
 			entryJSON, err := json.Marshal(entry)
 			if err != nil {
 				continue

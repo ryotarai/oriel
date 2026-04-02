@@ -24,6 +24,7 @@ type Message struct {
 	UUID      string          `json:"uuid"`
 	SessionID string          `json:"sessionId"`
 	Timestamp string          `json:"timestamp"`
+	CWD       string          `json:"cwd"`
 	Message   json.RawMessage `json:"message"`
 	IsMeta    bool            `json:"isMeta,omitempty"`
 	Origin    *MessageOrigin  `json:"origin,omitempty"`
@@ -54,6 +55,7 @@ type ConversationEntry struct {
 	Type       string `json:"type"`
 	Role       string `json:"role"`
 	UUID       string `json:"uuid"`
+	CWD        string `json:"cwd,omitempty"`
 	Text       string `json:"text"`
 	IsThinking bool   `json:"isThinking,omitempty"`
 	// Tool use fields
@@ -275,6 +277,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 			Type: msg.Type,
 			Role: msg.Type,
 			UUID: msg.UUID,
+			CWD:  msg.CWD,
 			Text: str,
 		}}
 	}
@@ -305,6 +308,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				Type: msg.Type,
 				Role: msg.Type,
 				UUID: uuid,
+				CWD:  msg.CWD,
 				Text: block.Text,
 			})
 		case "thinking":
@@ -319,6 +323,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				Type:       msg.Type,
 				Role:       msg.Type,
 				UUID:       uuid,
+				CWD:        msg.CWD,
 				Text:       text,
 				IsThinking: true,
 			})
@@ -331,6 +336,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				Type:      "tool_use",
 				Role:      msg.Type,
 				UUID:      uuid,
+				CWD:       msg.CWD,
 				ToolName:  block.Name,
 				ToolInput: inputStr,
 				ToolUseID: block.ID,
@@ -341,6 +347,7 @@ func extractEntries(content json.RawMessage, msg Message) []ConversationEntry {
 				Type:      "tool_result",
 				Role:      msg.Type,
 				UUID:      uuid,
+				CWD:       msg.CWD,
 				Text:      text,
 				ToolUseID: block.ToolUseID,
 				IsError:   block.IsError,
