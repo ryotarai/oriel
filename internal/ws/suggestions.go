@@ -25,7 +25,7 @@ const suggestionsPrompt = "Based on the conversation so far, suggest 3-5 possibl
 
 // generateSuggestions calls claude CLI to generate reply suggestions for a session.
 func (h *Handler) generateSuggestions(claudeSessionID string) ([]suggestion, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, h.command,
