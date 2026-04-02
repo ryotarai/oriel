@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/ryotarai/oriel/internal/state"
 	wslib "github.com/ryotarai/oriel/internal/ws"
 )
 
@@ -20,7 +21,13 @@ type wsMessage struct {
 }
 
 func TestHandler_EchoRoundTrip(t *testing.T) {
-	h := wslib.NewHandler("cat")
+	dbPath := t.TempDir() + "/test.db"
+	store, err := state.Open(dbPath)
+	if err != nil {
+		t.Fatalf("state.Open: %v", err)
+	}
+	defer store.Close()
+	h := wslib.NewHandler("cat", store)
 	srv := httptest.NewServer(http.HandlerFunc(h.ServeHTTP))
 	defer srv.Close()
 
