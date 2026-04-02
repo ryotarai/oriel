@@ -304,8 +304,14 @@ func (h *Handler) watchConversation(s *session) {
 	convCh := make(chan conversation.ConversationEntry, 64)
 	go conversation.WatchSession(pid, convCh, done, func(uuid string) {
 		log.Printf("Session %s: discovered Claude session UUID %s", s.id, uuid)
+		// For resumed sessions, use the original session ID because
+		// conversation data lives in the original session's JSONL.
+		effectiveID := uuid
+		if resumeID != "" {
+			effectiveID = resumeID
+		}
 		s.mu.Lock()
-		s.claudeSessionID = uuid
+		s.claudeSessionID = effectiveID
 		s.mu.Unlock()
 		// Don't broadcast yet — wait until the session has conversation content
 		// so that empty sessions don't get a claudeSessionId saved to DB.
@@ -365,14 +371,9 @@ func (h *Handler) watchConversation(s *session) {
 			h.broadcast(s, message{Type: "conversation", Entry: entryJSON})
 
 			// After first real conversation entry, broadcast the UUID to save to DB.
-			// For resumed sessions, broadcast the resume ID (Claude writes to the
-			// original session's JSONL, so that's the one to --resume on next restart).
 			if !uuidBroadcast {
 				s.mu.Lock()
 				uuid := s.claudeSessionID
-				if resumeID != "" {
-					uuid = resumeID
-				}
 				s.mu.Unlock()
 				if uuid != "" {
 					h.broadcast(s, message{Type: "claude_session_id", Data: uuid})

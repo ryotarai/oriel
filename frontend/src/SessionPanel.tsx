@@ -401,7 +401,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         ws.send(JSON.stringify({ type: "request_suggestions" }));
       }
     }
-  }, [running, entries.length]);
+  }, [running]);
 
   // Clear suggestions when user sends a new message (session becomes running again)
   useEffect(() => {
