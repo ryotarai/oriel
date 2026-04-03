@@ -517,6 +517,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
         if (activeTab !== "conversation") return;
+        if (textareaMode) return;
         if (!panelRef.current?.contains(document.activeElement) && document.activeElement !== document.body) return;
         e.preventDefault();
         setSearchOpen(true);
@@ -525,7 +526,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab]);
+  }, [activeTab, textareaMode]);
 
   // Search match computation
   const searchMatches = useMemo(() => {
