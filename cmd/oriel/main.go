@@ -84,7 +84,7 @@ func main() {
 
 	token := auth.GenerateToken()
 
-	handler := ws.NewHandler(*command, *listenAddr, token, store)
+	handler := ws.NewHandler(*command, *listenAddr, store)
 
 	distFS, err := fs.Sub(frontend.Dist, "dist")
 	if err != nil {
@@ -97,7 +97,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
-	mux.HandleFunc("/api/sessions/", handler.HandleIdle) // idle_prompt hook endpoint
+	mux.HandleFunc("/api/noauth/sessions/", handler.HandleIdle) // idle_prompt hook endpoint
 	mux.HandleFunc("/api/diff", handler.HandleDiff)
 	mux.HandleFunc("/api/dirs", fileexplorer.HandleDirs)
 	mux.HandleFunc("/api/files/tree", fileexplorer.HandleTree)

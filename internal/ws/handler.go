@@ -109,17 +109,15 @@ func (s *subscriber) writeJSON(msg message) error {
 type Handler struct {
 	command    string
 	listenAddr string
-	token      string
 	store      *state.Store
 	mu         sync.Mutex
 	sessions   map[string]*session
 }
 
-func NewHandler(command string, listenAddr string, token string, store *state.Store) *Handler {
+func NewHandler(command string, listenAddr string, store *state.Store) *Handler {
 	return &Handler{
 		command:    command,
 		listenAddr: listenAddr,
-		token:      token,
 		store:      store,
 		sessions:   make(map[string]*session),
 	}
@@ -181,7 +179,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
 
 	// Inject idle_prompt Notification hook via --settings
-	idleURL := fmt.Sprintf("http://%s/api/sessions/%s/idle?token=%s", h.listenAddr, s.id, h.token)
+	idleURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s/idle", h.listenAddr, s.id)
 	settingsJSON := fmt.Sprintf(`{"hooks":{"Notification":[{"matcher":"idle_prompt","hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
@@ -526,13 +524,13 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract oriel session ID from URL path: /api/sessions/{id}/idle
+	// Extract oriel session ID from URL path: /api/noauth/sessions/{id}/idle
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 4 || parts[0] != "api" || parts[1] != "sessions" || parts[3] != "idle" {
+	if len(parts) < 5 || parts[0] != "api" || parts[1] != "noauth" || parts[2] != "sessions" || parts[4] != "idle" {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	sessionID := parts[2]
+	sessionID := parts[3]
 
 	// Parse hook payload
 	var payload struct {
