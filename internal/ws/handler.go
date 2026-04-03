@@ -900,30 +900,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				default:
 				}
 			}
-		case "request_suggestions":
-			s.mu.Lock()
-			claudeSessionID := s.claudeSessionID
-			sessionCwd := s.cwd
-			s.mu.Unlock()
-			if claudeSessionID == "" {
-				sub.writeJSON(message{Type: "suggestions_error", Data: "no session ID"})
-				continue
-			}
-			go func() {
-				suggestions, err := h.generateSuggestions(claudeSessionID, sessionCwd)
-				if err != nil {
-					slog.Warn("Suggestions generation failed", "session", s.id, "error", err)
-					sub.writeJSON(message{Type: "suggestions_error", Data: err.Error()})
-					return
-				}
-				data, err := json.Marshal(suggestions)
-				if err != nil {
-					slog.Error("Failed to marshal suggestions", "session", s.id, "error", err)
-					sub.writeJSON(message{Type: "suggestions_error", Data: err.Error()})
-					return
-				}
-				sub.writeJSON(message{Type: "suggestions", Data: string(data)})
-			}()
 		case "set_cwd":
 			newCwd := msg.Data
 			if newCwd != "" {
