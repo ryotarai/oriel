@@ -282,6 +282,15 @@ export default function App() {
     setTabs((prev) => prev.map((t) => t.id === id ? { ...t, name } : t));
   }, []);
 
+  const reorderTabs = useCallback((activeId: string, overId: string) => {
+    setTabs((prev) => {
+      const oldIndex = prev.findIndex((t) => t.id === activeId);
+      const newIndex = prev.findIndex((t) => t.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }, []);
+
   return (
     <div className="h-screen w-screen bg-[#0a0a0f] flex flex-col overflow-hidden">
       {/* Main pane area — render ALL tabs, hide inactive ones to preserve xterm state */}
@@ -361,6 +370,7 @@ export default function App() {
         onAddTab={addTab}
         onDeleteTab={deleteTab}
         onRenameTab={renameTab}
+        onReorderTabs={reorderTabs}
       />
     </div>
   );
