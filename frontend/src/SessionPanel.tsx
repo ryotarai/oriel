@@ -364,6 +364,39 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
   }, [entries, suggestionsLoading, suggestions]);
 
+  // Scroll to bottom when switching back to conversation tab
+  useEffect(() => {
+    if (activeTab === "conversation" && isNearBottom.current) {
+      const el = chatScrollRef.current;
+      if (el) {
+        programmaticScroll.current = true;
+        el.scrollTop = el.scrollHeight;
+        requestAnimationFrame(() => {
+          programmaticScroll.current = false;
+        });
+      }
+    }
+  }, [activeTab]);
+
+  // Scroll to bottom when container becomes visible (e.g., workspace tab switch)
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.height > 0 && isNearBottom.current) {
+          programmaticScroll.current = true;
+          el.scrollTop = el.scrollHeight;
+          requestAnimationFrame(() => {
+            programmaticScroll.current = false;
+          });
+        }
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // Extract task state from conversation entries
   useEffect(() => {
     const taskMap = new Map<string, TaskItem>();
@@ -461,6 +494,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        if (!isFocused) return;
         if (activeTab !== "conversation") return;
         if (textareaMode) return;
         if (!panelRef.current?.contains(document.activeElement) && document.activeElement !== document.body) return;
@@ -471,7 +505,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, textareaMode]);
+  }, [activeTab, textareaMode, isFocused]);
 
   // Search match computation
   const searchMatches = useMemo(() => {
