@@ -83,6 +83,9 @@ type session struct {
 
 	// Editor state: non-nil channel when an EDITOR process is waiting for user input
 	editorDoneCh chan editorResult
+
+	// cancelWatchConv cancels the current watchConversation goroutine.
+	cancelWatchConv context.CancelFunc
 }
 
 type restartRequest struct {
@@ -184,7 +187,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	baseURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s", h.listenAddr, s.id)
 	settingsJSON := fmt.Sprintf(`{"hooks":{`+
 		`"Stop":[{"hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/idle"}]}],`+
-		`"SessionStart":[{"matcher":"clear","hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/session-start"}]}],`+
+		`"SessionStart":[{"matcher":"clear|resume","hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/session-start"}]}],`+
 		`"UserPromptSubmit":[{"hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/prompt-submitted"}]}]`+
 		`}}`, baseURL, baseURL, baseURL)
 	slog.Debug("startProcess: injecting --settings", "settings", settingsJSON, "session", s.id)
@@ -219,7 +222,19 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	s.mu.Unlock()
 
 	go h.readPtyLoop(s)
-	go h.watchConversation(s)
+
+	// Create context for watchConversation; cancelled when session restarts or PTY exits
+	watchCtx, watchCancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.cancelWatchConv = watchCancel
+	s.mu.Unlock()
+	// Also cancel when PTY exits
+	go func() {
+		<-ptySess.Done()
+		watchCancel()
+	}()
+	go h.watchConversation(s, watchCtx, "")
+
 	go h.startFileWatcher(s, ptySess.Done())
 
 	return nil
@@ -229,10 +244,16 @@ func (h *Handler) restartLoop(s *session) {
 	for req := range s.restartCh {
 		slog.Debug("Session restarting", "session", s.id, "resume", req.resumeSessionID)
 
-		// Close old process
+		// Cancel the old watcher before closing the process
 		s.mu.Lock()
+		if s.cancelWatchConv != nil {
+			s.cancelWatchConv()
+			s.cancelWatchConv = nil
+		}
 		oldPty := s.pty
 		s.mu.Unlock()
+
+		// Close old process
 		if oldPty != nil {
 			oldPty.Close()
 		}
@@ -244,37 +265,12 @@ func (h *Handler) restartLoop(s *session) {
 		s.ptyOutputBuf = nil
 		s.claudeSessionID = ""
 		s.resumeSessionID = ""
-		cwd := s.cwd
 		epoch := s.convEpoch
 		s.mu.Unlock()
 		h.broadcast(s, message{Type: "conversation_reset", Epoch: epoch})
 
-		// If resuming, load the old session's conversation entries
-		if req.resumeSessionID != "" && conversation.SessionHasContent(cwd, req.resumeSessionID) {
-			s.mu.Lock()
-			s.resumeSessionID = req.resumeSessionID
-			s.mu.Unlock()
-			oldEntries := conversation.ReadSessionEntries(cwd, req.resumeSessionID)
-			if len(oldEntries) > 0 {
-				s.mu.Lock()
-				s.convHistory = append(s.convHistory, oldEntries...)
-				s.mu.Unlock()
-				for _, entry := range oldEntries {
-					entryJSON, err := json.Marshal(entry)
-					if err != nil {
-						continue
-					}
-					h.broadcast(s, message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
-				}
-			}
-		}
-
-		// Start new process
-		var args []string
-		if req.resumeSessionID != "" && conversation.SessionHasContent(cwd, req.resumeSessionID) {
-			args = []string{"--resume", req.resumeSessionID}
-		}
-		if err := h.startProcess(s, args...); err != nil {
+		// Start new process (set_cwd path; resumeSessionID is always empty here)
+		if err := h.startProcess(s); err != nil {
 			slog.Error("Session restart failed", "session", s.id, "error", err)
 			h.broadcast(s, message{Type: "error", Data: err.Error()})
 			continue
@@ -314,39 +310,32 @@ func (h *Handler) readPtyLoop(s *session) {
 	}
 }
 
-func (h *Handler) watchConversation(s *session) {
+func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptPath string) {
 	s.mu.Lock()
 	pid := s.pty.Pid()
-	done := s.pty.Done()
 	resumeID := s.resumeSessionID
 	epoch := s.convEpoch
 	s.mu.Unlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		select {
-		case <-done:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	defer cancel()
-
 	convCh := make(chan conversation.ConversationEntry, 64)
-	go conversation.WatchSession(ctx, pid, convCh, func(uuid string) {
-		slog.Debug("Discovered Claude session UUID", "session", s.id, "uuid", uuid)
-		// For resumed sessions, use the original session ID because
-		// conversation data lives in the original session's JSONL.
-		effectiveID := uuid
-		if resumeID != "" {
-			effectiveID = resumeID
-		}
-		s.mu.Lock()
-		s.claudeSessionID = effectiveID
-		s.mu.Unlock()
-		// Don't broadcast yet — wait until the session has conversation content
-		// so that empty sessions don't get a claudeSessionId saved to DB.
-	}, resumeID)
+	if transcriptPath != "" {
+		go conversation.WatchTranscriptPath(ctx, transcriptPath, convCh)
+	} else {
+		go conversation.WatchSession(ctx, pid, convCh, func(uuid string) {
+			slog.Debug("Discovered Claude session UUID", "session", s.id, "uuid", uuid)
+			// For resumed sessions, use the original session ID because
+			// conversation data lives in the original session's JSONL.
+			effectiveID := uuid
+			if resumeID != "" {
+				effectiveID = resumeID
+			}
+			s.mu.Lock()
+			s.claudeSessionID = effectiveID
+			s.mu.Unlock()
+			// Don't broadcast yet — wait until the session has conversation content
+			// so that empty sessions don't get a claudeSessionId saved to DB.
+		}, resumeID)
+	}
 
 	uuidBroadcast := false
 	// Track pending EnterWorktree tool call ID to detect the corresponding
@@ -714,21 +703,39 @@ func (h *Handler) HandleSessionStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Source string `json:"source"`
+		Source         string `json:"source"`
+		SessionID      string `json:"session_id"`
+		TranscriptPath string `json:"transcript_path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		slog.Debug("SessionStart hook: failed to decode body", "err", err)
 	}
 
-	slog.Debug("SessionStart hook received", "session", sessionID, "source", body.Source)
+	slog.Debug("SessionStart hook received", "session", sessionID, "source", body.Source, "sessionID", body.SessionID, "transcriptPath", body.TranscriptPath)
 	w.WriteHeader(http.StatusOK)
 
-	if body.Source == "clear" {
-		select {
-		case s.restartCh <- restartRequest{}:
-		default:
-		}
+	// Handle clear and resume as soft resets: cancel old watcher, reset state, start new watcher.
+	// Do NOT restart the Claude process — the PTY keeps running.
+	s.mu.Lock()
+	if s.cancelWatchConv != nil {
+		s.cancelWatchConv()
+		s.cancelWatchConv = nil
 	}
+	s.convEpoch++
+	s.convHistory = nil
+	s.ptyOutputBuf = nil
+	s.claudeSessionID = body.SessionID
+	s.resumeSessionID = ""
+	epoch := s.convEpoch
+	s.mu.Unlock()
+
+	h.broadcast(s, message{Type: "conversation_reset", Epoch: epoch})
+
+	newCtx, newCancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.cancelWatchConv = newCancel
+	s.mu.Unlock()
+	go h.watchConversation(s, newCtx, body.TranscriptPath)
 }
 
 // HandlePromptSubmitted is called by Claude Code's UserPromptSubmit hook.
@@ -1061,16 +1068,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				s.rows = uint16(msg.Rows)
 				s.mu.Unlock()
 				pty.Resize(uint16(msg.Cols), uint16(msg.Rows))
-			}
-		case "resume":
-			// Resume a specific session by ID
-			sessionToResume := msg.Data
-			if sessionToResume != "" {
-				slog.Debug("Resume requested", "session", s.id, "resumeSession", sessionToResume)
-				select {
-				case s.restartCh <- restartRequest{resumeSessionID: sessionToResume}:
-				default:
-				}
 			}
 		case "set_cwd":
 			newCwd := msg.Data
