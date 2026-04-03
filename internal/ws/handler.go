@@ -180,7 +180,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	// Inject idle_prompt Notification hook via --settings
 	idleURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s/idle", h.listenAddr, s.id)
-	settingsJSON := fmt.Sprintf(`{"hooks":{"Notification":[{"matcher":"idle_prompt","hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
+	settingsJSON := fmt.Sprintf(`{"messageIdleNotifThresholdMs":0,"hooks":{"Notification":[{"matcher":"idle_prompt","hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
 	allArgs = append(allArgs, args...)
@@ -519,6 +519,7 @@ func (h *Handler) broadcast(s *session, msg message) {
 // HandleIdle is called by Claude Code's idle_prompt Notification hook.
 // It triggers reply suggestion generation and broadcasts results via WebSocket.
 func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("HandleIdle called", "method", r.Method, "path", r.URL.Path)
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
