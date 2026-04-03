@@ -555,6 +555,9 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 	// Return 200 immediately to not block Claude Code's hook
 	w.WriteHeader(http.StatusOK)
 
+	// Notify frontend that suggestions are being generated
+	h.broadcast(s, message{Type: "suggestions_loading"})
+
 	// Generate suggestions in background and broadcast to subscribers
 	go func() {
 		claudeSessionID := payload.SessionID

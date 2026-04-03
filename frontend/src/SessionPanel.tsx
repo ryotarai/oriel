@@ -269,6 +269,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           }
           const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
           handleConversation(entry);
+        } else if (msg.type === "suggestions_loading") {
+          setSuggestions([]);
+          setSuggestionsLoading(true);
         } else if (msg.type === "suggestions") {
           try {
             const parsed = JSON.parse(msg.data);
@@ -472,37 +475,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     setRunning(last.type !== "assistant");
   }, [entries]);
 
-  // Show suggestions loading when session becomes idle (hook will auto-trigger)
-  const prevRunningRef = useRef(false);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    const wasRunning = prevRunningRef.current;
-    prevRunningRef.current = running;
-
-    if (wasRunning && !running && entries.length > 0) {
-      // Debounce: wait 2s to confirm session is truly idle
-      idleTimerRef.current = setTimeout(() => {
-        setSuggestions([]);
-        setSuggestionsLoading(true);
-        // Safety timeout: stop spinner after 30s if no response from hook
-        setTimeout(() => setSuggestionsLoading(false), 30000);
-      }, 2000);
-    }
-
-    if (running) {
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-        idleTimerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-        idleTimerRef.current = null;
-      }
-    };
-  }, [running]);
 
   // Clear suggestions when user sends a new message (session becomes running again)
   useEffect(() => {
