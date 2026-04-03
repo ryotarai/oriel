@@ -175,8 +175,9 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	baseURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s", h.listenAddr, s.id)
 	settingsJSON := fmt.Sprintf(`{"hooks":{`+
 		`"Stop":[{"hooks":[{"type":"http","url":"%s/idle"}]}],`+
-		`"SessionStart":[{"matcher":"clear","hooks":[{"type":"http","url":"%s/clear"}]}]`+
-		`}}`, baseURL, baseURL)
+		`"SessionStart":[{"matcher":"clear","hooks":[{"type":"http","url":"%s/clear"}]}],`+
+		`"UserPromptSubmit":[{"hooks":[{"type":"http","url":"%s/prompt-submitted"}]}]`+
+		`}}`, baseURL, baseURL, baseURL)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
 	allArgs = append(allArgs, args...)
@@ -496,6 +497,9 @@ func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
 		case "clear":
 			h.HandleClear(w, r)
 			return
+		case "prompt-submitted":
+			h.HandlePromptSubmitted(w, r)
+			return
 		}
 	}
 	http.Error(w, "not found", http.StatusNotFound)
@@ -538,6 +542,9 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 
 	// Return 200 immediately to not block Claude Code's hook
 	w.WriteHeader(http.StatusOK)
+
+	// Notify frontend that Claude has stopped (idle)
+	h.broadcast(s, message{Type: "running", Data: "false"})
 
 	// Notify frontend that suggestions are being generated
 	h.broadcast(s, message{Type: "suggestions_loading"})
@@ -611,6 +618,35 @@ func (h *Handler) HandleClear(w http.ResponseWriter, r *http.Request) {
 	case s.restartCh <- restartRequest{}:
 	default:
 	}
+}
+
+// HandlePromptSubmitted is called by Claude Code's UserPromptSubmit hook.
+// It broadcasts running=true to all WebSocket subscribers.
+func (h *Handler) HandlePromptSubmitted(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 5 {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[3]
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	slog.Debug("UserPromptSubmit hook received", "session", sessionID)
+	w.WriteHeader(http.StatusOK)
+
+	h.broadcast(s, message{Type: "running", Data: "true"})
 }
 
 // HandleListSessions returns the session list for the current project as JSON.

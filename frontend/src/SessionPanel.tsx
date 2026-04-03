@@ -269,6 +269,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           }
           const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
           handleConversation(entry);
+        } else if (msg.type === "running") {
+          setRunning(msg.data === "true");
         } else if (msg.type === "suggestions_loading") {
           setSuggestions([]);
           setSuggestionsLoading(true);
@@ -456,24 +458,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     setTasks(Array.from(taskMap.values()));
   }, [entries]);
 
-  // Detect running state from conversation entries
-  useEffect(() => {
-    if (entries.length === 0) {
-      setRunning(false);
-      return;
-    }
-    // Find the last entry that is not a local command (!command)
-    let last = entries[entries.length - 1];
-    for (let i = entries.length - 1; i >= 0; i--) {
-      if (!isLocalCommand(entries[i])) {
-        last = entries[i];
-        break;
-      }
-    }
-    // Claude is done when the last entry is assistant text (final response).
-    // Otherwise (tool_use, tool_result, user input), Claude is actively working.
-    setRunning(last.type !== "assistant");
-  }, [entries]);
 
 
   // Clear suggestions when user sends a new message (session becomes running again)
@@ -1087,18 +1071,6 @@ function formatTimestamp(ts: string): string {
 }
 
 /** Returns true if this user entry is a local !command execution, not a real user prompt. */
-function isLocalCommand(entry: ConversationEntry): boolean {
-  if (entry.role !== "user") return false;
-  const t = entry.text;
-  return (
-    t.startsWith("<bash-input>") ||
-    t.startsWith("<bash-stdout>") ||
-    t.startsWith("<bash-stderr>") ||
-    t.startsWith("<local-command-caveat>") ||
-    t.startsWith("<local-command-stdout>")
-  );
-}
-
 function shouldShowTimestamp(prev: string | undefined, curr: string | undefined): boolean {
   if (!curr) return false;
   if (!prev) return true;
