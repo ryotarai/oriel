@@ -518,6 +518,81 @@ func (h *Handler) broadcast(s *session, msg message) {
 	}
 }
 
+// HandleIdle is called by Claude Code's idle_prompt Notification hook.
+// It triggers reply suggestion generation and broadcasts results via WebSocket.
+func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract oriel session ID from URL path: /api/sessions/{id}/idle
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 4 || parts[0] != "api" || parts[1] != "sessions" || parts[3] != "idle" {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[2]
+
+	// Parse hook payload
+	var payload struct {
+		SessionID string `json:"session_id"`
+		CWD       string `json:"cwd"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	// Return 200 immediately to not block Claude Code's hook
+	w.WriteHeader(http.StatusOK)
+
+	// Generate suggestions in background and broadcast to subscribers
+	go func() {
+		claudeSessionID := payload.SessionID
+		sessionCwd := payload.CWD
+		if claudeSessionID == "" || sessionCwd == "" {
+			s.mu.Lock()
+			if claudeSessionID == "" {
+				claudeSessionID = s.claudeSessionID
+			}
+			if sessionCwd == "" {
+				sessionCwd = s.cwd
+			}
+			s.mu.Unlock()
+		}
+
+		if claudeSessionID == "" {
+			slog.Warn("Cannot generate suggestions: no Claude session ID", "session", sessionID)
+			return
+		}
+
+		slog.Debug("Generating suggestions from idle_prompt hook", "session", sessionID, "claudeSession", claudeSessionID)
+
+		suggestions, err := h.generateSuggestions(claudeSessionID, sessionCwd)
+		if err != nil {
+			slog.Warn("Suggestions generation failed", "session", sessionID, "error", err)
+			h.broadcast(s, message{Type: "suggestions_error", Data: err.Error()})
+			return
+		}
+
+		data, err := json.Marshal(suggestions)
+		if err != nil {
+			slog.Error("Failed to marshal suggestions", "session", sessionID, "error", err)
+			return
+		}
+		h.broadcast(s, message{Type: "suggestions", Data: string(data)})
+	}()
+}
+
 // HandleListSessions returns the session list for the current project as JSON.
 func (h *Handler) HandleListSessions(w http.ResponseWriter, r *http.Request) {
 	// Find project path from any active session
