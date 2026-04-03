@@ -86,7 +86,10 @@ export default function App() {
               };
             });
           setTabs(loadedTabs);
-          setActiveTabId(loadedTabs[0].id);
+          // Restore active tab from URL hash, or default to first tab
+          const hashMatch = window.location.hash.match(/^#tab=(\d+)$/);
+          const hashIdx = hashMatch ? parseInt(hashMatch[1], 10) : -1;
+          setActiveTabId(hashIdx >= 0 && hashIdx < loadedTabs.length ? loadedTabs[hashIdx].id : loadedTabs[0].id);
         }
         setInitialLoadDone(true);
       })
@@ -124,11 +127,55 @@ export default function App() {
     fetch("/api/config").then((r) => r.json()).then(setAppConfig).catch(() => {});
   }, [showSettings]);
 
+  // Sync active tab to URL hash (only after initial load to avoid overwriting hash before restore)
+  useEffect(() => {
+    if (!initialLoadDone) return;
+    const tabIndex = tabs.findIndex((t) => t.id === activeTabId);
+    if (tabIndex >= 0) {
+      const newHash = `#tab=${tabIndex}`;
+      if (window.location.hash !== newHash) {
+        window.history.replaceState(null, "", newHash);
+      }
+    }
+  }, [activeTabId, tabs, initialLoadDone]);
+
   // Cmd+Left/Right pane navigation (scoped to active tab)
+  // Cmd+1-9 to focus pane by number
+  // Shift+Cmd+1-9 to switch tab by number
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
       if (!isMod) return;
+
+      // Cmd+1-9: focus pane (without shift)
+      // Shift+Cmd+1-9: switch tab
+      const digitMatch = e.code.match(/^Digit(\d)$/);
+      if (digitMatch && isMod) {
+        const num = parseInt(digitMatch[1], 10);
+        if (num < 1 || num > 9) return;
+        // Always prevent default to block browser handling of Cmd+1-9 / Shift+Cmd+1-9
+        e.preventDefault();
+        const idx = num - 1;
+
+        if (e.shiftKey) {
+          // Shift+Cmd+N: switch to tab N
+          if (idx < tabs.length) {
+            setActiveTabId(tabs[idx].id);
+          }
+        } else {
+          // Cmd+N: focus pane N in active tab
+          if (idx < activeTab.panes.length) {
+            const targetPane = activeTab.panes[idx];
+            const handle = paneRefs.current.get(targetPane.id);
+            if (handle) {
+              handle.focus();
+              updateActiveTab((tab) => ({ ...tab, activePaneIndex: idx }));
+            }
+          }
+        }
+        return;
+      }
+
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
       e.preventDefault();
@@ -144,7 +191,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeTab]);
+  }, [activeTab, tabs]);
 
   // Helper to update the active tab
   const updateActiveTab = useCallback((updater: (tab: TabConfig) => TabConfig) => {
