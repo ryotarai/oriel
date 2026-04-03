@@ -382,8 +382,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
+    const observer = new ResizeObserver((resizeEntries) => {
+      for (const entry of resizeEntries) {
         if (entry.contentRect.height > 0 && isNearBottom.current) {
           programmaticScroll.current = true;
           el.scrollTop = el.scrollHeight;
