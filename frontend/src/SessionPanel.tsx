@@ -868,8 +868,43 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       />
 
       {/* Terminal (bottom) */}
-      <div style={{ height: `${100 - splitPct}%` }} className="min-h-0">
-        <div ref={containerRef} className="h-full" />
+      <div style={{ height: `${100 - splitPct}%` }} className="min-h-0 relative">
+        <div ref={containerRef} className={`h-full ${textareaMode ? "invisible" : ""}`} />
+        {textareaMode && (
+          <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
+            <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-400 border-b border-gray-700 shrink-0">
+              <span>Textarea Mode — <kbd className="bg-gray-700 px-1 rounded">⌘Enter</kbd> to send, <kbd className="bg-gray-700 px-1 rounded">Esc</kbd> to cancel</span>
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={textareaValue}
+              onChange={(e) => setTextareaValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  if (textareaValue) {
+                    sendInputToTerminal(textareaValue);
+                  }
+                  setTextareaMode(false);
+                  setTextareaValue("");
+                  setTimeout(() => termRef.current?.focus(), 0);
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setTextareaMode(false);
+                  setTextareaValue("");
+                  setTimeout(() => termRef.current?.focus(), 0);
+                }
+              }}
+              className="flex-1 w-full p-2 text-sm text-gray-200 resize-none outline-none"
+              style={{
+                background: "#0a0a0f",
+                fontFamily: "Menlo, Monaco, 'Courier New', monospace",
+                fontSize: 12,
+              }}
+              spellCheck={false}
+            />
+          </div>
+        )}
       </div>
 
       {/* Resume modal */}
