@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -178,6 +179,12 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	s.mu.Unlock()
 
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
+
+	// Inject idle_prompt Notification hook via --settings
+	idleURL := fmt.Sprintf("http://%s/api/sessions/%s/idle?token=%s", h.listenAddr, s.id, h.token)
+	settingsJSON := fmt.Sprintf(`{"hooks":{"Notification":[{"matcher":"idle_prompt","hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
+	allArgs = append(allArgs, "--settings", settingsJSON)
+
 	allArgs = append(allArgs, args...)
 
 	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, allArgs...)
