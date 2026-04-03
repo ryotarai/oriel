@@ -64,6 +64,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [connected, setConnected] = useState(false);
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
   const seenUUIDs = useRef(new Set<string>());
+  const convEpoch = useRef<number>(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
@@ -238,6 +239,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         } else if (msg.type === "conversation_reset") {
           term.reset();
           seenUUIDs.current.clear();
+          convEpoch.current = msg.epoch ?? 0;
           setEntries([]);
           setSuggestions([]);
           setSuggestionsLoading(false);
@@ -249,6 +251,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         } else if (msg.type === "claude_session_id" && msg.data) {
           onClaudeSessionIdRef.current?.(msg.data);
         } else if (msg.type === "conversation" && msg.entry) {
+          // Ignore stale conversation entries from old watchConversation goroutines
+          if (msg.epoch !== undefined && msg.epoch < convEpoch.current) {
+            return;
+          }
           const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
           handleConversation(entry);
         } else if (msg.type === "suggestions") {

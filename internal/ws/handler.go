@@ -41,6 +41,7 @@ type message struct {
 	Cols  int             `json:"cols,omitempty"`
 	Rows  int             `json:"rows,omitempty"`
 	Entry json.RawMessage `json:"entry,omitempty"`
+	Epoch uint64          `json:"epoch,omitempty"`
 }
 
 const ptyOutputBufSize = 256 * 1024 // 256 KiB ring buffer for PTY output replay
@@ -77,6 +78,10 @@ type session struct {
 	// correct JSONL file because Claude writes to the original session's file, not
 	// the newly created one.
 	resumeSessionID string
+
+	// Epoch counter: incremented on every restart to discard stale conversation
+	// entries from old watchConversation goroutines that race with conversation_reset.
+	convEpoch uint64
 
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
@@ -202,13 +207,15 @@ func (h *Handler) restartLoop(s *session) {
 
 		// Clear conversation history, PTY output buffer, and session ID; notify frontend
 		s.mu.Lock()
+		s.convEpoch++
 		s.convHistory = nil
 		s.ptyOutputBuf = nil
 		s.claudeSessionID = ""
 		s.resumeSessionID = ""
 		cwd := s.cwd
+		epoch := s.convEpoch
 		s.mu.Unlock()
-		h.broadcast(s, message{Type: "conversation_reset"})
+		h.broadcast(s, message{Type: "conversation_reset", Epoch: epoch})
 
 		// If resuming, load the old session's conversation entries
 		if req.resumeSessionID != "" && conversation.SessionHasContent(cwd, req.resumeSessionID) {
@@ -225,7 +232,7 @@ func (h *Handler) restartLoop(s *session) {
 					if err != nil {
 						continue
 					}
-					h.broadcast(s, message{Type: "conversation", Entry: entryJSON})
+					h.broadcast(s, message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
 				}
 			}
 		}
@@ -307,6 +314,7 @@ func (h *Handler) watchConversation(s *session) {
 	pid := s.pty.Pid()
 	done := s.pty.Done()
 	resumeID := s.resumeSessionID
+	epoch := s.convEpoch
 	s.mu.Unlock()
 
 	convCh := make(chan conversation.ConversationEntry, 64)
@@ -337,6 +345,15 @@ func (h *Handler) watchConversation(s *session) {
 			if !ok {
 				return
 			}
+
+			// If the epoch has changed, this goroutine is stale — stop broadcasting.
+			s.mu.Lock()
+			if s.convEpoch != epoch {
+				s.mu.Unlock()
+				return
+			}
+			s.mu.Unlock()
+
 			if entry.Type == "reset" {
 				s.mu.Lock()
 				s.convHistory = nil
@@ -386,7 +403,7 @@ func (h *Handler) watchConversation(s *session) {
 			s.mu.Lock()
 			s.convHistory = append(s.convHistory, entry)
 			s.mu.Unlock()
-			h.broadcast(s, message{Type: "conversation", Entry: entryJSON})
+			h.broadcast(s, message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
 
 			// After first real conversation entry, broadcast the UUID to save to DB.
 			if !uuidBroadcast {
@@ -713,6 +730,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	claudeSessID := s.claudeSessionID
 	exited := s.exited
+	epoch := s.convEpoch
 	s.mu.Unlock()
 
 	defer func() {
@@ -736,7 +754,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		sub.writeJSON(message{Type: "conversation", Entry: entryJSON})
+		sub.writeJSON(message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
 	}
 
 	// Replay discovered Claude session UUID so the frontend can update its state
