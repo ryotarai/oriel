@@ -106,17 +106,21 @@ func (s *subscriber) writeJSON(msg message) error {
 // Handler manages multiple pty sessions, each identified by an ID
 // passed as a query parameter (?session=<id>).
 type Handler struct {
-	command  string
-	store    *state.Store
-	mu       sync.Mutex
-	sessions map[string]*session
+	command    string
+	listenAddr string
+	token      string
+	store      *state.Store
+	mu         sync.Mutex
+	sessions   map[string]*session
 }
 
-func NewHandler(command string, store *state.Store) *Handler {
+func NewHandler(command string, listenAddr string, token string, store *state.Store) *Handler {
 	return &Handler{
-		command:  command,
-		store:    store,
-		sessions: make(map[string]*session),
+		command:    command,
+		listenAddr: listenAddr,
+		token:      token,
+		store:      store,
+		sessions:   make(map[string]*session),
 	}
 }
 

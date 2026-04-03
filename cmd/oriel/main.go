@@ -84,7 +84,7 @@ func main() {
 
 	token := auth.GenerateToken()
 
-	handler := ws.NewHandler(*command, store)
+	handler := ws.NewHandler(*command, *listenAddr, token, store)
 
 	distFS, err := fs.Sub(frontend.Dist, "dist")
 	if err != nil {
