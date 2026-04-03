@@ -126,7 +126,7 @@ func SessionHasContent(cwd, sessionID string) bool {
 // If onSessionID is non-nil, it is called with the discovered Claude session UUID.
 // If resumeSessionID is non-empty, the JSONL for that session is watched instead
 // of the discovered one (Claude --resume writes to the original session's file).
-func WatchSession(childPID int, ch chan<- ConversationEntry, ctx context.Context, onSessionID func(string), resumeSessionID string) {
+func WatchSession(ctx context.Context, childPID int, ch chan<- ConversationEntry, onSessionID func(string), resumeSessionID string) {
 	slog.Debug("Discovering session", "pid", childPID)
 
 	var projDir, sessionID string
@@ -187,7 +187,7 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, ctx context.Context
 	if info, err := os.Stat(jsonlPath); err == nil {
 		offset = info.Size()
 	}
-	tailJSONL(jsonlPath, offset, ch, ctx)
+	tailJSONL(ctx, jsonlPath, offset, ch)
 }
 
 // WatchTranscriptPath waits for the file at transcriptPath to appear, reads all
@@ -224,7 +224,7 @@ func WatchTranscriptPath(ctx context.Context, transcriptPath string, ch chan<- C
 	if info, err := os.Stat(transcriptPath); err == nil {
 		offset = info.Size()
 	}
-	tailJSONL(transcriptPath, offset, ch, ctx)
+	tailJSONL(ctx, transcriptPath, offset, ch)
 }
 
 func readAllEntries(jsonlPath string) []ConversationEntry {
@@ -246,7 +246,7 @@ func readAllEntries(jsonlPath string) []ConversationEntry {
 	return entries
 }
 
-func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, ctx context.Context) {
+func tailJSONL(ctx context.Context, jsonlPath string, offset int64, ch chan<- ConversationEntry) {
 	f, err := os.Open(jsonlPath)
 	if err != nil {
 		return
@@ -268,7 +268,11 @@ func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, ctx 
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err == io.EOF {
-				time.Sleep(200 * time.Millisecond)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(200 * time.Millisecond):
+				}
 				continue
 			}
 			return

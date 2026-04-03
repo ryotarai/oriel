@@ -333,7 +333,7 @@ func (h *Handler) watchConversation(s *session) {
 	defer cancel()
 
 	convCh := make(chan conversation.ConversationEntry, 64)
-	go conversation.WatchSession(pid, convCh, ctx, func(uuid string) {
+	go conversation.WatchSession(ctx, pid, convCh, func(uuid string) {
 		slog.Debug("Discovered Claude session UUID", "session", s.id, "uuid", uuid)
 		// For resumed sessions, use the original session ID because
 		// conversation data lives in the original session's JSONL.
@@ -430,7 +430,7 @@ func (h *Handler) watchConversation(s *session) {
 					uuidBroadcast = true
 				}
 			}
-		case <-done:
+		case <-ctx.Done():
 			return
 		}
 	}
