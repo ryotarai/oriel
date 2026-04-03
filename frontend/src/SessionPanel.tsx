@@ -69,6 +69,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
   const programmaticScroll = useRef(false);
+  const [showNewMessages, setShowNewMessages] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const swapEnterRef = useRef(swapEnterKeys ?? true);
@@ -371,8 +372,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     const handleScroll = () => {
       if (programmaticScroll.current) return;
       const threshold = 80;
-      isNearBottom.current =
-        el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      isNearBottom.current = nearBottom;
+      if (nearBottom) {
+        setShowNewMessages(false);
+      }
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
@@ -389,6 +393,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           programmaticScroll.current = false;
         });
       }
+    } else {
+      setShowNewMessages(true);
     }
   }, [entries, suggestionsLoading, suggestions]);
 
@@ -848,6 +854,25 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 </div>
               )}
             </div>
+            {showNewMessages && (
+              <button
+                onClick={() => {
+                  const el = chatScrollRef.current;
+                  if (el) {
+                    programmaticScroll.current = true;
+                    el.scrollTop = el.scrollHeight;
+                    requestAnimationFrame(() => {
+                      programmaticScroll.current = false;
+                    });
+                  }
+                  setShowNewMessages(false);
+                }}
+                className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs shadow-lg transition-colors cursor-pointer"
+              >
+                <span>&#8595;</span>
+                <span>New Messages</span>
+              </button>
+            )}
           </div>
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "diff" ? "hidden" : ""}`}>
