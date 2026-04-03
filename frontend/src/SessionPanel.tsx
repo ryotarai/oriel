@@ -32,15 +32,7 @@ interface TaskItem {
   status: string;
 }
 
-interface SessionSummary {
-  sessionId: string;
-  firstMessage: string;
-  messageCount: number;
-  lastActivity: number;
-}
-
 export interface SessionPanelHandle {
-  openResumeModal: () => void;
   openCwdPicker: () => void;
   focus: () => void;
 }
@@ -146,11 +138,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     setActiveTab("files");
   }, []);
 
-  // Resume modal
-  const [showResumeModal, setShowResumeModal] = useState(false);
-  const [sessionList, setSessionList] = useState<SessionSummary[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(false);
-
   // CWD picker
   const [showCwdPicker, setShowCwdPicker] = useState(false);
   const [cwdInput, setCwdInput] = useState(cwd ?? "");
@@ -180,34 +167,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     setEntries((prev) => [...prev, entry]);
   }, []);
 
-  const sendResume = useCallback((targetSessionId: string) => {
-    // Save the resume target to DB immediately so it persists across restarts
-    onClaudeSessionIdRef.current?.(targetSessionId);
-    const ws = wsRef.current;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "resume", data: targetSessionId }));
-    }
-    setShowResumeModal(false);
-  }, []);
-
-  const openResumeModal = useCallback(async () => {
-    setShowResumeModal(true);
-    setLoadingSessions(true);
-    try {
-      const resp = await fetch("/api/sessions");
-      const data = await resp.json();
-      setSessionList(data || []);
-    } catch {
-      setSessionList([]);
-    }
-    setLoadingSessions(false);
-  }, []);
-
   useImperativeHandle(ref, () => ({
-    openResumeModal,
     openCwdPicker: () => { setShowCwdPicker(true); fetchDirs(cwd ?? ""); },
     focus: () => { termRef.current?.focus(); },
-  }), [openResumeModal, fetchDirs, cwd]);
+  }), [fetchDirs, cwd]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -878,16 +841,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         )}
       </div>
 
-      {/* Resume modal */}
-      {showResumeModal && (
-        <ResumeModal
-          sessions={sessionList}
-          loading={loadingSessions}
-          onSelect={sendResume}
-          onClose={() => setShowResumeModal(false)}
-        />
-      )}
-
       {/* CWD picker modal */}
       {showCwdPicker && (
         <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center p-4">
@@ -966,61 +919,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     </div>
   );
 });
-
-function ResumeModal({
-  sessions,
-  loading,
-  onSelect,
-  onClose,
-}: {
-  sessions: SessionSummary[];
-  loading: boolean;
-  onSelect: (id: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute inset-0 bg-black/70 z-20 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-lg max-h-[80%] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h2 className="text-gray-100 font-medium">Resume Session</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {loading && (
-            <div className="text-gray-400 text-sm text-center py-8">Loading sessions...</div>
-          )}
-          {!loading && sessions.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-8">No sessions found</div>
-          )}
-          {!loading && sessions.map((s) => (
-            <button
-              key={s.sessionId}
-              onClick={() => onSelect(s.sessionId)}
-              className="w-full text-left px-4 py-3 hover:bg-gray-800 border-b border-gray-800 transition-colors"
-            >
-              <div className="text-gray-200 text-sm truncate">{s.firstMessage}</div>
-              <div className="text-gray-500 text-xs mt-1">
-                {s.messageCount} messages · {formatRelativeTime(s.lastActivity)}
-                <span className="text-gray-600 ml-2">{s.sessionId.slice(0, 8)}…</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatRelativeTime(tsMillis: number): string {
-  const seconds = Math.floor((Date.now() - tsMillis) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 interface BashParts {
   input?: string;

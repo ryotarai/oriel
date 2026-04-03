@@ -470,13 +470,6 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
             📁
           </button>
           <button
-            onClick={() => sessionRef.current?.openResumeModal()}
-            className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
-            title="Resume session"
-          >
-            ↻
-          </button>
-          <button
             onClick={onAdd}
             className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded border border-gray-600"
             title="Add pane"
