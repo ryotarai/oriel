@@ -116,6 +116,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [searchMatchIdx, setSearchMatchIdx] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const [textareaMode, setTextareaMode] = useState(false);
+  const [textareaValue, setTextareaValue] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const effectiveDir = worktreeDir || cwd || "";
 
   const sendInputToTerminal = useCallback((text: string) => {
@@ -127,6 +131,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
     termRef.current?.focus();
   }, []);
+
+  // Focus textarea when entering textarea mode
+  useEffect(() => {
+    if (textareaMode) {
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [textareaMode]);
 
   const openFileInExplorer = useCallback((path: string) => {
     setFileToOpen(path);
@@ -289,6 +300,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (e.type !== "keydown") return true;
       // Don't intercept IME composition events (e.g. Japanese input confirm)
       if (e.isComposing || e.keyCode === 229) return true;
+      // Ctrl-G: switch to textarea mode
+      if (e.key === "g" && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        setTextareaMode(true);
+        setTextareaValue("");
+        return false;
+      }
       if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
         if (!swapEnterRef.current) return true; // Swap disabled — normal Enter
         // Send Ctrl+J (\n) instead of \r
@@ -742,6 +760,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 </div>
               )}
               {entries.filter((entry) => {
+                // Always show ExitPlanMode tool_use (rendered as markdown plan)
+                if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") return true;
                 if (!showTools && entry.type === "tool_use") return false;
                 if (!showTools && entry.type === "tool_result") {
                   // Show Agent tool results even when tools are hidden
@@ -759,7 +779,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   const matchingUse = entries.find(
                     (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
                   );
-                  if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate")) {
+                  if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate" || matchingUse.toolName === "ExitPlanMode")) {
                     return false;
                   }
                   // Hide successful Edit/Write results but show errors
@@ -1078,6 +1098,10 @@ function shouldShowTimestamp(prev: string | undefined, curr: string | undefined)
 }
 
 function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
+  if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") {
+    return <ExitPlanModeBlock entry={entry} />;
+  }
+
   if (entry.type === "tool_use") {
     return <ToolUseBlock entry={entry} />;
   }
@@ -1236,6 +1260,43 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
         >
           {entry.text}
         </ReactMarkdown>
+      </div>
+    </div>
+  );
+}
+
+function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
+  let parsedInput: Record<string, unknown> | null = null;
+  try {
+    parsedInput = JSON.parse(entry.toolInput ?? "{}");
+  } catch {}
+
+  const plan = typeof parsedInput?.plan === "string" ? parsedInput.plan : "";
+
+  return (
+    <div className="my-1">
+      <div className="rounded-lg bg-gray-800/60 border border-gray-700/50 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs mb-2">
+          <span className="text-blue-400 font-medium">Plan</span>
+        </div>
+        {plan && (
+          <div className="prose prose-invert prose-sm max-w-none
+            prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
+            prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
+            prose-li:text-gray-200 prose-li:my-0
+            prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
+            prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
+            prose-a:text-blue-400
+            prose-strong:text-gray-100
+          ">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {plan}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
