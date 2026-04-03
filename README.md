@@ -10,7 +10,7 @@ A rich web UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 - **Parallel sessions** -- Run multiple Claude Code panes side by side, each with its own terminal and working directory
 - **Reply suggestions** -- One-click follow-up suggestions appear after each response
 - **Session resume** -- Pick up any previous conversation with one click; layout and context are fully restored
-- **Readable conversation** -- Markdown rendering, inline agent results, syntax highlighting, and clickable file paths
+- **Readable conversation** -- Markdown rendering, Mermaid diagrams, inline agent results, syntax highlighting, and clickable file paths
 - **File explorer & commit history** -- Browse code and review git commits without leaving the browser
 
 ## Quick Start
@@ -43,7 +43,7 @@ The server starts, prints a URL with an auth token, and opens your browser autom
 
 ### Conversation View
 
-Renders Claude's responses with full markdown, syntax-highlighted code blocks, expandable tool use/result details, and clickable file path links. Agent tool results are rendered as full markdown instead of collapsed blocks, so you can read sub-agent output inline. Select any text and press **r** to insert it as a quoted reply in the terminal.
+Renders Claude's responses with full markdown, syntax-highlighted code blocks, Mermaid diagrams, expandable tool use/result details, and clickable file path links. Agent tool results are rendered as full markdown instead of collapsed blocks, so you can read sub-agent output inline. Use **Cmd/Ctrl + F** to search within the conversation. Select any text and press **r** to insert it as a quoted reply in the terminal. Copy buttons on messages and code blocks let you grab content quickly. A floating "New Messages" indicator appears when you're scrolled up and new messages arrive.
 
 ### Reply Suggestions
 
@@ -59,7 +59,7 @@ Shows all file changes made during the session with per-file unified diffs and s
 
 ### File Explorer
 
-Browse the working directory tree and view file contents with syntax highlighting. Like the diff viewer, every line has a one-click button to ask Claude about it.
+Browse the working directory tree and view file contents with syntax highlighting. Markdown files can be toggled between raw source and rendered preview. A "Changed Only" filter lets you narrow the tree to modified files. Like the diff viewer, every line has a one-click button to ask Claude about it.
 
 ### Commits
 
@@ -67,7 +67,7 @@ View recent git commits with full messages and diffs. Quickly review what Claude
 
 ### Multi-Tab, Multi-Pane Layout
 
-Organize your work into tabs, each containing one or more Claude Code panes. Drag dividers to resize panes, drag tabs to reorder them, and double-click a tab to rename it. Each pane runs its own independent Claude session with its own working directory.
+Organize your work into tabs, each containing one or more Claude Code panes. Drag dividers to resize panes, drag tabs to reorder them, and double-click a tab to rename it. Each pane runs its own independent Claude session with its own working directory. The active tab is persisted in the URL hash so refreshing preserves your position.
 
 ### Session Resume
 
@@ -83,14 +83,33 @@ Each pane can target a different project directory. Click the folder icon in the
 
 ### Keyboard Shortcuts
 
+#### Terminal Input
+
 | Shortcut | Action |
 |----------|--------|
 | **Enter** | Newline (multiline input) |
 | **Cmd/Ctrl + Enter** | Submit to Claude |
-| **Cmd/Ctrl + Arrow** | Move focus between panes |
+| **Ctrl + G** | Toggle textarea mode for multiline input |
 | **r** (with text selected) | Quote-reply selected text in the terminal |
 
 > Enter/Cmd+Enter behavior can be swapped in Settings.
+
+#### Navigation
+
+| Shortcut | Action |
+|----------|--------|
+| **Cmd/Ctrl + Arrow Left/Right** | Move focus between panes |
+| **Cmd/Ctrl + 1-9** | Focus pane by number |
+| **Shift + Cmd/Ctrl + 1-9** | Switch to tab by number |
+
+#### Conversation
+
+| Shortcut | Action |
+|----------|--------|
+| **Cmd/Ctrl + F** | Search in conversation |
+| **Enter** (in search) | Next search result |
+| **Shift + Enter** (in search) | Previous search result |
+| **Escape** (in search) | Close search |
 
 ## CLI Options
 
@@ -100,6 +119,7 @@ Each pane can target a different project directory. Click the folder icon in the
 | `-command` | `claude` | CLI command to run in the terminal |
 | `-no-open` | `false` | Don't auto-open the browser on startup |
 | `-state-db` | `~/.config/oriel/state.sqlite3` | Path to the SQLite state database |
+| `-log-level` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
 
 ```bash
 # Listen on a different port
