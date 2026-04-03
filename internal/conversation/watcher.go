@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -121,17 +122,17 @@ func SessionHasContent(cwd, sessionID string) bool {
 }
 
 // WatchSession discovers the session JSONL from the child PID, reads existing
-// entries, then tails for new ones. Runs until done is closed.
+// entries, then tails for new ones. Runs until ctx is cancelled.
 // If onSessionID is non-nil, it is called with the discovered Claude session UUID.
 // If resumeSessionID is non-empty, the JSONL for that session is watched instead
 // of the discovered one (Claude --resume writes to the original session's file).
-func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}, onSessionID func(string), resumeSessionID string) {
+func WatchSession(childPID int, ch chan<- ConversationEntry, ctx context.Context, onSessionID func(string), resumeSessionID string) {
 	slog.Debug("Discovering session", "pid", childPID)
 
 	var projDir, sessionID string
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -164,7 +165,7 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 			break
 		}
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		case <-time.After(500 * time.Millisecond):
 		}
@@ -175,7 +176,7 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		for _, entry := range entries {
 			select {
 			case ch <- entry:
-			case <-done:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -186,7 +187,44 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 	if info, err := os.Stat(jsonlPath); err == nil {
 		offset = info.Size()
 	}
-	tailJSONL(jsonlPath, offset, ch, done)
+	tailJSONL(jsonlPath, offset, ch, ctx)
+}
+
+// WatchTranscriptPath waits for the file at transcriptPath to appear, reads all
+// existing entries, then tails for new entries. Returns when ctx is cancelled.
+// The caller is responsible for managing the channel lifecycle (do not close ch here).
+func WatchTranscriptPath(ctx context.Context, transcriptPath string, ch chan<- ConversationEntry) {
+	slog.Debug("Watching transcript path", "path", transcriptPath)
+
+	// Wait for file to appear
+	for {
+		if _, err := os.Stat(transcriptPath); err == nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+
+	// Read existing entries
+	if entries := readAllEntries(transcriptPath); len(entries) > 0 {
+		for _, entry := range entries {
+			select {
+			case ch <- entry:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+
+	// Tail for new entries
+	var offset int64
+	if info, err := os.Stat(transcriptPath); err == nil {
+		offset = info.Size()
+	}
+	tailJSONL(transcriptPath, offset, ch, ctx)
 }
 
 func readAllEntries(jsonlPath string) []ConversationEntry {
@@ -208,7 +246,7 @@ func readAllEntries(jsonlPath string) []ConversationEntry {
 	return entries
 }
 
-func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, done <-chan struct{}) {
+func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, ctx context.Context) {
 	f, err := os.Open(jsonlPath)
 	if err != nil {
 		return
@@ -222,7 +260,7 @@ func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, done
 	reader := bufio.NewReader(f)
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -239,7 +277,7 @@ func tailJSONL(jsonlPath string, offset int64, ch chan<- ConversationEntry, done
 		for _, entry := range parseLine(line) {
 			select {
 			case ch <- entry:
-			case <-done:
+			case <-ctx.Done():
 				return
 			}
 		}

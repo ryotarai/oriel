@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -182,10 +183,11 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	// Inject hooks via --settings
 	baseURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s", h.listenAddr, s.id)
 	settingsJSON := fmt.Sprintf(`{"hooks":{`+
-		`"Stop":[{"hooks":[{"type":"http","url":"%s/idle"}]}],`+
-		`"SessionStart":[{"matcher":"clear","hooks":[{"type":"http","url":"%s/clear"}]}],`+
-		`"UserPromptSubmit":[{"hooks":[{"type":"http","url":"%s/prompt-submitted"}]}]`+
+		`"Stop":[{"hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/idle"}]}],`+
+		`"SessionStart":[{"matcher":"clear","hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/session-start"}]}],`+
+		`"UserPromptSubmit":[{"hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/prompt-submitted"}]}]`+
 		`}}`, baseURL, baseURL, baseURL)
+	slog.Debug("startProcess: injecting --settings", "settings", settingsJSON, "session", s.id)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
 	allArgs = append(allArgs, args...)
@@ -320,8 +322,18 @@ func (h *Handler) watchConversation(s *session) {
 	epoch := s.convEpoch
 	s.mu.Unlock()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	defer cancel()
+
 	convCh := make(chan conversation.ConversationEntry, 64)
-	go conversation.WatchSession(pid, convCh, done, func(uuid string) {
+	go conversation.WatchSession(pid, convCh, ctx, func(uuid string) {
 		slog.Debug("Discovered Claude session UUID", "session", s.id, "uuid", uuid)
 		// For resumed sessions, use the original session ID because
 		// conversation data lives in the original session's JSONL.
@@ -512,14 +524,15 @@ func (h *Handler) broadcast(s *session, msg message) {
 
 // HandleHook dispatches /api/noauth/sessions/{id}/{action} to the appropriate handler.
 func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("HandleHook called", "method", r.Method, "path", r.URL.Path)
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) >= 5 {
 		switch parts[4] {
 		case "idle":
 			h.HandleIdle(w, r)
 			return
-		case "clear":
-			h.HandleClear(w, r)
+		case "session-start":
+			h.HandleSessionStart(w, r)
 			return
 		case "prompt-submitted":
 			h.HandlePromptSubmitted(w, r)
@@ -529,6 +542,7 @@ func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	slog.Warn("HandleHook: unrecognized path", "path", r.URL.Path)
 	http.Error(w, "not found", http.StatusNotFound)
 }
 
@@ -675,17 +689,17 @@ func (h *Handler) HandleEditorOpen(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
-// HandleClear is called by Claude Code's SessionStart hook with matcher "clear".
-// It triggers a session restart, replacing the fragile PTY output pattern matching.
-func (h *Handler) HandleClear(w http.ResponseWriter, r *http.Request) {
+// HandleSessionStart is called by Claude Code's SessionStart hook for all session starts.
+// It triggers a session restart when source == "clear".
+func (h *Handler) HandleSessionStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract oriel session ID from URL path: /api/noauth/sessions/{id}/clear
+	// Extract oriel session ID from URL path: /api/noauth/sessions/{id}/session-start
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 || parts[0] != "api" || parts[1] != "noauth" || parts[2] != "sessions" || parts[4] != "clear" {
+	if len(parts) < 5 || parts[0] != "api" || parts[1] != "noauth" || parts[2] != "sessions" || parts[4] != "session-start" {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
@@ -699,12 +713,21 @@ func (h *Handler) HandleClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Debug("SessionStart clear hook received", "session", sessionID)
+	var body struct {
+		Source string `json:"source"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		slog.Debug("SessionStart hook: failed to decode body", "err", err)
+	}
+
+	slog.Debug("SessionStart hook received", "session", sessionID, "source", body.Source)
 	w.WriteHeader(http.StatusOK)
 
-	select {
-	case s.restartCh <- restartRequest{}:
-	default:
+	if body.Source == "clear" {
+		select {
+		case s.restartCh <- restartRequest{}:
+		default:
+		}
 	}
 }
 
