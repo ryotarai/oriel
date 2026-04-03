@@ -472,52 +472,28 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     setRunning(last.type !== "assistant");
   }, [entries]);
 
-  // Request reply suggestions when session becomes idle (debounced to avoid
-  // false triggers when assistant text entries arrive between tool calls)
+  // Show suggestions loading when session becomes idle (hook will auto-trigger)
   const prevRunningRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suggestionsRequestedRef = useRef(false);
   useEffect(() => {
     const wasRunning = prevRunningRef.current;
     prevRunningRef.current = running;
 
-    if (wasRunning && !running && entries.length > 0 && !suggestionsRequestedRef.current) {
+    if (wasRunning && !running && entries.length > 0) {
       // Debounce: wait 2s to confirm session is truly idle
       idleTimerRef.current = setTimeout(() => {
-        if (suggestionsRequestedRef.current) return;
-        suggestionsRequestedRef.current = true;
-
-        // Request suggestions
-        const ws = wsRef.current;
-        if (ws?.readyState === WebSocket.OPEN) {
-          setSuggestions([]);
-          setSuggestionsLoading(true);
-          ws.send(JSON.stringify({ type: "request_suggestions" }));
-          // Safety timeout: stop spinner after 30s if no response
-          setTimeout(() => setSuggestionsLoading(false), 30000);
-        }
-
-        // Send desktop notification when not focused
-        if (document.hidden || !document.hasFocus()) {
-          if ("Notification" in window && Notification.permission === "granted") {
-            const lastEntry = entries[entries.length - 1];
-            const preview = lastEntry?.text?.slice(0, 80) || "Response complete";
-            new Notification("Oriel", {
-              body: preview + (lastEntry?.text && lastEntry.text.length > 80 ? "..." : ""),
-              tag: "oriel-response-" + sessionId,
-            });
-          }
-        }
+        setSuggestions([]);
+        setSuggestionsLoading(true);
+        // Safety timeout: stop spinner after 30s if no response from hook
+        setTimeout(() => setSuggestionsLoading(false), 30000);
       }, 2000);
     }
 
-    // Cancel debounce and reset guard if running becomes true again (user sent new message)
     if (running) {
       if (idleTimerRef.current) {
         clearTimeout(idleTimerRef.current);
         idleTimerRef.current = null;
       }
-      suggestionsRequestedRef.current = false;
     }
 
     return () => {
