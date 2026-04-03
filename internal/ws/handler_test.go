@@ -27,7 +27,7 @@ func TestHandler_EchoRoundTrip(t *testing.T) {
 		t.Fatalf("state.Open: %v", err)
 	}
 	defer store.Close()
-	h := wslib.NewHandler("cat", store)
+	h := wslib.NewHandler("cat", "localhost:9111", "test-token", store)
 	srv := httptest.NewServer(http.HandlerFunc(h.ServeHTTP))
 	defer srv.Close()
 
