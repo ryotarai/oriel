@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/ryotarai/oriel/frontend"
@@ -29,24 +29,46 @@ func main() {
 	command := flag.String("command", "claude", "Command to run in pty")
 	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
 	stateDB := flag.String("state-db", "", "Path to state database (default: ~/.config/oriel/state.sqlite3)")
+	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	flag.Parse()
 
-	// Set up debug log file
+	// Parse log level
+	var slogLevel slog.Level
+	switch strings.ToLower(*logLevel) {
+	case "debug":
+		slogLevel = slog.LevelDebug
+	case "info":
+		slogLevel = slog.LevelInfo
+	case "warn", "warning":
+		slogLevel = slog.LevelWarn
+	case "error":
+		slogLevel = slog.LevelError
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown log level %q, using info\n", *logLevel)
+		slogLevel = slog.LevelInfo
+	}
+
+	// Set up logging: stderr uses the configured level
+	stderrHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slogLevel})
+
+	// Set up debug log file: captures all levels (debug and above)
 	if home, err := os.UserHomeDir(); err == nil {
 		logDir := filepath.Join(home, ".local", "oriel")
 		os.MkdirAll(logDir, 0o755)
 		logPath := filepath.Join(logDir, "debug.log")
 		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
-			log.Printf("Warning: could not open debug log %s: %v", logPath, err)
+			slog.SetDefault(slog.New(stderrHandler))
+			slog.Warn("Could not open debug log", "path", logPath, "error", err)
 		} else {
 			defer logFile.Close()
-			// Ensure file permissions are correct even if file already existed
 			os.Chmod(logPath, 0o600)
-			// Write to both stderr and the log file
-			log.SetOutput(io.MultiWriter(os.Stderr, logFile))
-			log.Printf("Debug log: %s", logPath)
+			fileHandler := slog.NewTextHandler(logFile, &slog.HandlerOptions{Level: slog.LevelDebug})
+			slog.SetDefault(slog.New(multiHandler{stderrHandler, fileHandler}))
+			slog.Debug("Debug log enabled", "path", logPath)
 		}
+	} else {
+		slog.SetDefault(slog.New(stderrHandler))
 	}
 
 	dbPath := *stateDB
@@ -55,7 +77,8 @@ func main() {
 	}
 	store, err := state.Open(dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open state database: %v", err)
+		slog.Error("Failed to open state database", "error", err)
+		os.Exit(1)
 	}
 	defer store.Close()
 
@@ -65,7 +88,8 @@ func main() {
 
 	distFS, err := fs.Sub(frontend.Dist, "dist")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to load frontend dist", "error", err)
+		os.Exit(1)
 	}
 
 	config.Load()
@@ -85,12 +109,13 @@ func main() {
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)
-	log.Printf("Listening on %s", *listenAddr)
+	slog.Info("Listening", "addr", *listenAddr)
 	fmt.Fprintf(os.Stderr, "Open %s\n", url)
 
 	go func() {
 		if err := http.ListenAndServe(*listenAddr, auth.Middleware(token, mux)); err != nil {
-			log.Fatal(err)
+			slog.Error("HTTP server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -103,7 +128,7 @@ func main() {
 	for {
 		s := <-sig
 		if s == syscall.SIGTERM {
-			log.Println("Received SIGTERM, shutting down")
+			slog.Info("Received SIGTERM, shutting down")
 			break
 		}
 		// SIGINT: prompt for confirmation
@@ -117,14 +142,14 @@ func main() {
 		select {
 		case answer := <-answerCh:
 			if answer == "y" || answer == "Y" {
-				log.Println("Shutting down")
+				slog.Info("Shutting down")
 				return
 			}
 			fmt.Println("Cancelled. Press Ctrl-C again to be prompted.")
 		case s := <-sig:
 			// Second signal while waiting for input — force quit
 			fmt.Println()
-			log.Printf("Received %v again, shutting down", s)
+			slog.Info("Received signal again, shutting down", "signal", s)
 			return
 		}
 	}

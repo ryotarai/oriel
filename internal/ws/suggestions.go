@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os/exec"
 	"time"
 )
@@ -42,7 +42,7 @@ func (h *Handler) generateSuggestions(claudeSessionID string, cwd string) ([]sug
 		cmd.Dir = cwd
 	}
 
-	log.Printf("Generating suggestions for session %s", claudeSessionID)
+	slog.Debug("Generating suggestions", "claudeSession", claudeSessionID)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

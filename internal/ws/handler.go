@@ -3,7 +3,7 @@ package ws
 import (
 	"encoding/base64"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -195,7 +195,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 func (h *Handler) restartLoop(s *session) {
 	for req := range s.restartCh {
-		log.Printf("Session %s: restarting (resume=%s)", s.id, req.resumeSessionID)
+		slog.Debug("Session restarting", "session", s.id, "resume", req.resumeSessionID)
 
 		// Close old process
 		s.mu.Lock()
@@ -243,12 +243,12 @@ func (h *Handler) restartLoop(s *session) {
 			args = []string{"--resume", req.resumeSessionID}
 		}
 		if err := h.startProcess(s, args...); err != nil {
-			log.Printf("Session %s: restart failed: %v", s.id, err)
+			slog.Error("Session restart failed", "session", s.id, "error", err)
 			h.broadcast(s, message{Type: "error", Data: err.Error()})
 			continue
 		}
 
-		log.Printf("Session %s: restarted successfully", s.id)
+		slog.Debug("Session restarted successfully", "session", s.id)
 	}
 }
 
@@ -290,7 +290,7 @@ func (h *Handler) readPtyLoop(s *session) {
 
 		// Detect /clear: "(no content)" in output
 		if clearPattern.MatchString(text) {
-			log.Printf("Session %s: detected /clear", s.id)
+			slog.Debug("Detected /clear", "session", s.id)
 			detectBuf.Reset()
 			select {
 			case s.restartCh <- restartRequest{}:
@@ -319,7 +319,7 @@ func (h *Handler) watchConversation(s *session) {
 
 	convCh := make(chan conversation.ConversationEntry, 64)
 	go conversation.WatchSession(pid, convCh, done, func(uuid string) {
-		log.Printf("Session %s: discovered Claude session UUID %s", s.id, uuid)
+		slog.Debug("Discovered Claude session UUID", "session", s.id, "uuid", uuid)
 		// For resumed sessions, use the original session ID because
 		// conversation data lives in the original session's JSONL.
 		effectiveID := uuid
@@ -364,11 +364,11 @@ func (h *Handler) watchConversation(s *session) {
 
 			// Detect EnterWorktree/ExitWorktree tool calls
 			if entry.Type == "tool_use" && entry.ToolName == "EnterWorktree" {
-				log.Printf("Session %s: detected EnterWorktree tool call (id=%s)", s.id, entry.ToolUseID)
+				slog.Debug("Detected EnterWorktree tool call", "session", s.id, "toolUseID", entry.ToolUseID)
 				pendingEnterWorktreeToolID = entry.ToolUseID
 			}
 			if entry.Type == "tool_use" && entry.ToolName == "ExitWorktree" {
-				log.Printf("Session %s: detected ExitWorktree tool call", s.id)
+				slog.Debug("Detected ExitWorktree tool call", "session", s.id)
 				s.mu.Lock()
 				s.worktreeDir = ""
 				s.mu.Unlock()
@@ -382,7 +382,7 @@ func (h *Handler) watchConversation(s *session) {
 			// After EnterWorktree, the tool_result carries the new cwd
 			if pendingEnterWorktreeToolID != "" && entry.Type == "tool_result" && entry.ToolUseID == pendingEnterWorktreeToolID {
 				if entry.CWD != "" {
-					log.Printf("Session %s: worktree entered: %s", s.id, entry.CWD)
+					slog.Debug("Worktree entered", "session", s.id, "dir", entry.CWD)
 					s.mu.Lock()
 					s.worktreeDir = entry.CWD
 					s.mu.Unlock()
@@ -424,7 +424,7 @@ func (h *Handler) watchConversation(s *session) {
 func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Printf("Session %s: failed to start file watcher: %v", s.id, err)
+		slog.Error("Failed to start file watcher", "session", s.id, "error", err)
 		return
 	}
 	defer watcher.Close()
@@ -437,10 +437,10 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 	s.mu.Unlock()
 
 	if err := watcher.Add(dir); err != nil {
-		log.Printf("Session %s: failed to watch %s: %v", s.id, dir, err)
+		slog.Warn("Failed to watch directory", "session", s.id, "dir", dir, "error", err)
 		return
 	}
-	log.Printf("Session %s: watching %s for file changes", s.id, dir)
+	slog.Debug("Watching directory for file changes", "session", s.id, "dir", dir)
 
 	var debounceTimer *time.Timer
 
@@ -459,10 +459,10 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 				targetDir = s.cwd
 			}
 			if err := watcher.Add(targetDir); err != nil {
-				log.Printf("Session %s: failed to watch %s: %v", s.id, targetDir, err)
+				slog.Warn("Failed to watch directory", "session", s.id, "dir", targetDir, "error", err)
 			} else {
 				dir = targetDir
-				log.Printf("Session %s: switched file watcher to %s", s.id, dir)
+				slog.Debug("Switched file watcher directory", "session", s.id, "dir", dir)
 			}
 			// Trigger immediate refresh since directory changed
 			h.broadcast(s, message{Type: "files_changed"})
@@ -489,7 +489,7 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 			if !ok {
 				return
 			}
-			log.Printf("Session %s: file watcher error: %v", s.id, err)
+			slog.Warn("File watcher error", "session", s.id, "error", err)
 		}
 	}
 }
@@ -666,7 +666,7 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 			// Skip panes whose cwd no longer exists
 			if p.Cwd != "" {
 				if _, err := os.Stat(p.Cwd); os.IsNotExist(err) {
-					log.Printf("Skipping pane %s: cwd %s no longer exists", p.ID, p.Cwd)
+					slog.Debug("Skipping pane with non-existent cwd", "pane", p.ID, "cwd", p.Cwd)
 					continue
 				}
 			}
@@ -694,7 +694,7 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade: %v", err)
+		slog.Warn("WebSocket upgrade failed", "error", err)
 		return
 	}
 	defer conn.Close()
@@ -708,7 +708,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resumeID := r.URL.Query().Get("resume")
 	s, err := h.getOrCreateSession(sessionID, cwd, resumeID)
 	if err != nil {
-		log.Printf("Start session %s: %v", sessionID, err)
+		slog.Error("Failed to start session", "session", sessionID, "error", err)
 		conn.WriteJSON(message{Type: "error", Data: err.Error()})
 		return
 	}
@@ -790,7 +790,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case "input":
 			data, err := base64.StdEncoding.DecodeString(msg.Data)
 			if err != nil {
-				log.Printf("Decode input: %v", err)
+				slog.Warn("Failed to decode input", "error", err)
 				continue
 			}
 			if err := pty.Write(data); err != nil {
@@ -808,7 +808,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// Resume a specific session by ID
 			sessionToResume := msg.Data
 			if sessionToResume != "" {
-				log.Printf("Session %s: resume requested for %s", s.id, sessionToResume)
+				slog.Debug("Resume requested", "session", s.id, "resumeSession", sessionToResume)
 				select {
 				case s.restartCh <- restartRequest{resumeSessionID: sessionToResume}:
 				default:
@@ -826,13 +826,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			go func() {
 				suggestions, err := h.generateSuggestions(claudeSessionID, sessionCwd)
 				if err != nil {
-					log.Printf("Session %s: suggestions failed: %v", s.id, err)
+					slog.Warn("Suggestions generation failed", "session", s.id, "error", err)
 					sub.writeJSON(message{Type: "suggestions_error", Data: err.Error()})
 					return
 				}
 				data, err := json.Marshal(suggestions)
 				if err != nil {
-					log.Printf("Session %s: marshal suggestions: %v", s.id, err)
+					slog.Error("Failed to marshal suggestions", "session", s.id, "error", err)
 					sub.writeJSON(message{Type: "suggestions_error", Data: err.Error()})
 					return
 				}
@@ -846,7 +846,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					s.cwd = newCwd
 					s.claudeSessionID = ""
 					s.mu.Unlock()
-					log.Printf("Session %s: cwd changed to %s", s.id, newCwd)
+					slog.Debug("CWD changed", "session", s.id, "cwd", newCwd)
 					select {
 					case s.restartCh <- restartRequest{}:
 					default:

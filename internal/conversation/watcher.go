@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -126,7 +126,7 @@ func SessionHasContent(cwd, sessionID string) bool {
 // If resumeSessionID is non-empty, the JSONL for that session is watched instead
 // of the discovered one (Claude --resume writes to the original session's file).
 func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{}, onSessionID func(string), resumeSessionID string) {
-	log.Printf("Discovering session for PID %d...", childPID)
+	slog.Debug("Discovering session", "pid", childPID)
 
 	var projDir, sessionID string
 	for {
@@ -142,7 +142,7 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		}
 		projDir = projectDir(meta.CWD)
 		sessionID = meta.SessionID
-		log.Printf("Session: %s (project: %s)", sessionID, projDir)
+		slog.Debug("Session discovered", "sessionID", sessionID, "projectDir", projDir)
 		if onSessionID != nil {
 			onSessionID(sessionID)
 		}
@@ -156,7 +156,7 @@ func WatchSession(childPID int, ch chan<- ConversationEntry, done <-chan struct{
 		watchID = resumeSessionID
 	}
 	jsonlPath := filepath.Join(projDir, watchID+".jsonl")
-	log.Printf("Watching JSONL: %s", jsonlPath)
+	slog.Debug("Watching JSONL", "path", jsonlPath)
 
 	// Wait for file to appear
 	for {
