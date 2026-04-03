@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -25,12 +24,6 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-var (
-	// Matches the /clear output: "⎿  (no content)" (includes non-breaking space \u00a0)
-	clearPattern = regexp.MustCompile(`⎿[\s\x{00a0}]+\(no content\)`)
-	// Strip ANSI escape sequences for pattern matching
-	ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[>\[?][0-9;]*[a-zA-Z]`)
-)
 
 const appendSystemPrompt = `<critical_rules>
 When creating or entering a git worktree, you MUST use the EnterWorktree tool. When leaving a git worktree, you MUST use the ExitWorktree tool. NEVER use raw "git worktree add" + "cd" commands manually. This is critical for the UI to track your working directory correctly.
@@ -178,9 +171,12 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
 
-	// Inject Stop hook via --settings to trigger suggestions when Claude finishes responding
-	idleURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s/idle", h.listenAddr, s.id)
-	settingsJSON := fmt.Sprintf(`{"hooks":{"Stop":[{"hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
+	// Inject hooks via --settings
+	baseURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s", h.listenAddr, s.id)
+	settingsJSON := fmt.Sprintf(`{"hooks":{`+
+		`"Stop":[{"hooks":[{"type":"http","url":"%s/idle"}]}],`+
+		`"SessionStart":[{"matcher":"clear","hooks":[{"type":"http","url":"%s/clear"}]}]`+
+		`}}`, baseURL, baseURL)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
 	allArgs = append(allArgs, args...)
@@ -263,8 +259,6 @@ func (h *Handler) restartLoop(s *session) {
 
 func (h *Handler) readPtyLoop(s *session) {
 	buf := make([]byte, 4096)
-	// Buffer for detecting patterns across read boundaries
-	var detectBuf strings.Builder
 
 	for {
 		n, err := s.pty.Read(buf)
@@ -290,31 +284,6 @@ func (h *Handler) readPtyLoop(s *session) {
 			Type: "output",
 			Data: base64.StdEncoding.EncodeToString(data),
 		})
-
-		// Check for session change patterns in pty output
-		// "Resume this session with:\nclaude --resume <uuid>"
-		// Strip ANSI escape sequences before pattern matching
-		detectBuf.Write(data)
-		text := ansiPattern.ReplaceAllString(detectBuf.String(), "")
-
-		// Detect /clear
-		if clearPattern.MatchString(text) {
-			slog.Debug("Detected /clear", "session", s.id, "detectBuf", text)
-			detectBuf.Reset()
-			select {
-			case s.restartCh <- restartRequest{}:
-			default:
-			}
-			return
-		}
-
-
-		// Keep buffer bounded — only need last ~200 bytes for pattern matching
-		if detectBuf.Len() > 500 {
-			recent := text[len(text)-200:]
-			detectBuf.Reset()
-			detectBuf.WriteString(recent)
-		}
 	}
 }
 
@@ -516,7 +485,23 @@ func (h *Handler) broadcast(s *session, msg message) {
 	}
 }
 
-// HandleIdle is called by Claude Code's idle_prompt Notification hook.
+// HandleHook dispatches /api/noauth/sessions/{id}/{action} to the appropriate handler.
+func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) >= 5 {
+		switch parts[4] {
+		case "idle":
+			h.HandleIdle(w, r)
+			return
+		case "clear":
+			h.HandleClear(w, r)
+			return
+		}
+	}
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+// HandleIdle is called by Claude Code's Stop hook.
 // It triggers reply suggestion generation and broadcasts results via WebSocket.
 func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("HandleIdle called", "method", r.Method, "path", r.URL.Path)
@@ -593,6 +578,39 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 		}
 		h.broadcast(s, message{Type: "suggestions", Data: string(data)})
 	}()
+}
+
+// HandleClear is called by Claude Code's SessionStart hook with matcher "clear".
+// It triggers a session restart, replacing the fragile PTY output pattern matching.
+func (h *Handler) HandleClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract oriel session ID from URL path: /api/noauth/sessions/{id}/clear
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 5 || parts[0] != "api" || parts[1] != "noauth" || parts[2] != "sessions" || parts[4] != "clear" {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[3]
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	slog.Debug("SessionStart clear hook received", "session", sessionID)
+	w.WriteHeader(http.StatusOK)
+
+	select {
+	case s.restartCh <- restartRequest{}:
+	default:
+	}
 }
 
 // HandleListSessions returns the session list for the current project as JSON.
