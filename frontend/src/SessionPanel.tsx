@@ -390,7 +390,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         });
       }
     }
-  }, [entries]);
+  }, [entries, suggestionsLoading, suggestions]);
 
   // Extract task state from conversation entries
   useEffect(() => {
