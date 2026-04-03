@@ -178,9 +178,9 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
 
-	// Inject idle_prompt Notification hook via --settings
+	// Inject Stop hook via --settings to trigger suggestions when Claude finishes responding
 	idleURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s/idle", h.listenAddr, s.id)
-	settingsJSON := fmt.Sprintf(`{"messageIdleNotifThresholdMs":0,"hooks":{"Notification":[{"matcher":"idle_prompt","hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
+	settingsJSON := fmt.Sprintf(`{"hooks":{"Stop":[{"hooks":[{"type":"http","url":"%s"}]}]}}`, idleURL)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
 	allArgs = append(allArgs, args...)
