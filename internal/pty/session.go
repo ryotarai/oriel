@@ -23,13 +23,14 @@ type Session struct {
 	doneCh   chan struct{}
 }
 
-func NewSession(command string, cols, rows uint16, cwd string, args ...string) (*Session, error) {
+func NewSession(command string, cols, rows uint16, cwd string, extraEnv []string, args ...string) (*Session, error) {
 	cmd := exec.Command(command, args...)
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("COLUMNS=%d", cols),
 		fmt.Sprintf("LINES=%d", rows),
 		"TERM=xterm-256color",
 	)
+	cmd.Env = append(cmd.Env, extraEnv...)
 	if cwd != "" {
 		cmd.Dir = cwd
 	}

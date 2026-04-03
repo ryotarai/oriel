@@ -119,6 +119,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
   const [textareaMode, setTextareaMode] = useState(false);
   const [textareaValue, setTextareaValue] = useState("");
+  const [editorMode, setEditorMode] = useState(false); // true when opened via $EDITOR
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const effectiveDir = worktreeDir || cwd || "";
@@ -287,6 +288,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         } else if (msg.type === "files_changed") {
           fetchDiffDataRef.current();
           setFileRefreshTrigger(c => c + 1);
+        } else if (msg.type === "editor_open") {
+          setEditorMode(true);
+          setTextareaMode(true);
+          setTextareaValue(msg.data || "");
         }
       };
 
@@ -306,13 +311,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (e.type !== "keydown") return true;
       // Don't intercept IME composition events (e.g. Japanese input confirm)
       if (e.isComposing || e.keyCode === 229) return true;
-      // Ctrl-G: switch to textarea mode
-      if (e.key === "g" && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-        e.preventDefault();
-        setTextareaMode(true);
-        setTextareaValue("");
-        return false;
-      }
       if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
         if (!swapEnterRef.current) return true; // Swap disabled — normal Enter
         // Send Ctrl+J (\n) instead of \r
@@ -840,14 +838,29 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
-                  if (textareaValue) {
+                  if (editorMode) {
+                    const ws = wsRef.current;
+                    if (ws?.readyState === WebSocket.OPEN) {
+                      const bytes = new TextEncoder().encode(textareaValue);
+                      const base64 = btoa(String.fromCharCode(...bytes));
+                      ws.send(JSON.stringify({ type: "editor_done", data: base64 }));
+                    }
+                  } else if (textareaValue) {
                     sendInputToTerminal(textareaValue);
                   }
+                  setEditorMode(false);
                   setTextareaMode(false);
                   setTextareaValue("");
                   setTimeout(() => termRef.current?.focus(), 0);
                 } else if (e.key === "Escape") {
                   e.preventDefault();
+                  if (editorMode) {
+                    const ws = wsRef.current;
+                    if (ws?.readyState === WebSocket.OPEN) {
+                      ws.send(JSON.stringify({ type: "editor_cancel" }));
+                    }
+                  }
+                  setEditorMode(false);
                   setTextareaMode(false);
                   setTextareaValue("");
                   setTimeout(() => termRef.current?.focus(), 0);

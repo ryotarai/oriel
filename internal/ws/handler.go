@@ -79,10 +79,18 @@ type session struct {
 
 	// Signal channel: closed when the session needs to restart
 	restartCh chan restartRequest
+
+	// Editor state: non-nil channel when an EDITOR process is waiting for user input
+	editorDoneCh chan editorResult
 }
 
 type restartRequest struct {
 	resumeSessionID string // empty = fresh start, non-empty = --resume <id>
+}
+
+type editorResult struct {
+	Content   string `json:"content"`
+	Cancelled bool   `json:"cancelled"`
 }
 
 type subscriber struct {
@@ -182,7 +190,23 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	allArgs = append(allArgs, args...)
 
-	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, allArgs...)
+	// Create EDITOR wrapper script so Claude's Ctrl+G opens Oriel's textarea mode
+	selfPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("os.Executable: %w", err)
+	}
+	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id))
+	scriptContent := fmt.Sprintf("#!/bin/sh\nexec %s editor --url http://%s --session %s \"$@\"\n",
+		selfPath, h.listenAddr, s.id)
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+		return fmt.Errorf("write editor script: %w", err)
+	}
+	extraEnv := []string{
+		"EDITOR=" + scriptPath,
+		"VISUAL=" + scriptPath,
+	}
+
+	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, extraEnv, allArgs...)
 	if err != nil {
 		return err
 	}
@@ -500,6 +524,9 @@ func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
 		case "prompt-submitted":
 			h.HandlePromptSubmitted(w, r)
 			return
+		case "editor-open":
+			h.HandleEditorOpen(w, r)
+			return
 		}
 	}
 	http.Error(w, "not found", http.StatusNotFound)
@@ -585,6 +612,67 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 		}
 		h.broadcast(s, message{Type: "suggestions", Data: string(data)})
 	}()
+}
+
+// HandleEditorOpen is called by the oriel editor subcommand when Claude's $EDITOR is invoked.
+// It long-polls until the frontend sends editor_done or editor_cancel via WebSocket.
+func (h *Handler) HandleEditorOpen(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 5 {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[3]
+
+	var payload struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	s.mu.Lock()
+	if s.editorDoneCh != nil {
+		s.mu.Unlock()
+		http.Error(w, "editor already open", http.StatusConflict)
+		return
+	}
+	doneCh := make(chan editorResult, 1)
+	s.editorDoneCh = doneCh
+	s.mu.Unlock()
+
+	// Notify frontend to open textarea with the content
+	h.broadcast(s, message{Type: "editor_open", Data: payload.Content})
+
+	// Wait for frontend response
+	var result editorResult
+	select {
+	case result = <-doneCh:
+	case <-r.Context().Done():
+		result = editorResult{Cancelled: true}
+	}
+
+	// Cleanup
+	s.mu.Lock()
+	s.editorDoneCh = nil
+	s.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 // HandleClear is called by Claude Code's SessionStart hook with matcher "clear".
@@ -878,6 +966,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		s.mu.Lock()
 		delete(s.subs, sub)
+		// Cancel pending editor if this was the last subscriber
+		if len(s.subs) == 0 && s.editorDoneCh != nil {
+			s.editorDoneCh <- editorResult{Cancelled: true}
+			s.editorDoneCh = nil
+		}
 		s.mu.Unlock()
 		close(sub.doneCh)
 	}()
@@ -970,6 +1063,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 					}
 				}
+			}
+		case "editor_done":
+			data, err := base64.StdEncoding.DecodeString(msg.Data)
+			if err != nil {
+				slog.Warn("Failed to decode editor_done data", "error", err)
+				continue
+			}
+			s.mu.Lock()
+			ch := s.editorDoneCh
+			s.mu.Unlock()
+			if ch != nil {
+				ch <- editorResult{Content: string(data)}
+			}
+		case "editor_cancel":
+			s.mu.Lock()
+			ch := s.editorDoneCh
+			s.mu.Unlock()
+			if ch != nil {
+				ch <- editorResult{Cancelled: true}
 			}
 		}
 	}

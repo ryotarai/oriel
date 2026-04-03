@@ -9,7 +9,7 @@ import (
 )
 
 func TestSession_StartAndWrite(t *testing.T) {
-	s, err := ptylib.NewSession("cat", 80, 24, "")
+	s, err := ptylib.NewSession("cat", 80, 24, "", nil)
 	if err != nil {
 		t.Fatalf("NewSession: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestSession_StartAndWrite(t *testing.T) {
 }
 
 func TestSession_Resize(t *testing.T) {
-	s, err := ptylib.NewSession("cat", 80, 24, "")
+	s, err := ptylib.NewSession("cat", 80, 24, "", nil)
 	if err != nil {
 		t.Fatalf("NewSession: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestSession_Resize(t *testing.T) {
 }
 
 func TestSession_Close(t *testing.T) {
-	s, err := ptylib.NewSession("cat", 80, 24, "")
+	s, err := ptylib.NewSession("cat", 80, 24, "", nil)
 	if err != nil {
 		t.Fatalf("NewSession: %v", err)
 	}

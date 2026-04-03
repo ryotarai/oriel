@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -25,6 +26,12 @@ import (
 )
 
 func main() {
+	// Handle editor subcommand before parsing flags
+	if len(os.Args) >= 2 && os.Args[1] == "editor" {
+		runEditor()
+		return
+	}
+
 	listenAddr := flag.String("listen-addr", "localhost:9111", "Listen address (e.g. :8080, 127.0.0.1:3000)")
 	command := flag.String("command", "claude", "Command to run in pty")
 	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
@@ -189,4 +196,56 @@ func openBrowser(url string) {
 		return
 	}
 	cmd.Start()
+}
+
+// runEditor implements the "oriel editor" subcommand, invoked by Claude CLI
+// as $EDITOR. It sends the file content to the Oriel backend, waits for the
+// user to edit it in the web UI, and writes the result back to the file.
+func runEditor() {
+	fs := flag.NewFlagSet("editor", flag.ExitOnError)
+	urlFlag := fs.String("url", "", "Backend URL")
+	sessionFlag := fs.String("session", "", "Session ID")
+	fs.Parse(os.Args[2:])
+
+	tempfile := fs.Arg(0)
+	if tempfile == "" {
+		fmt.Fprintln(os.Stderr, "usage: oriel editor --url <url> --session <id> <file>")
+		os.Exit(1)
+	}
+
+	content, err := os.ReadFile(tempfile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read %s: %v\n", tempfile, err)
+		os.Exit(1)
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"content": string(content),
+	})
+
+	editorURL := fmt.Sprintf("%s/api/noauth/sessions/%s/editor-open", *urlFlag, *sessionFlag)
+	resp, err := http.Post(editorURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to contact backend: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Content   string `json:"content"`
+		Cancelled bool   `json:"cancelled"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to decode response: %v\n", err)
+		os.Exit(1)
+	}
+
+	if result.Cancelled {
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(tempfile, []byte(result.Content), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to write %s: %v\n", tempfile, err)
+		os.Exit(1)
+	}
 }
