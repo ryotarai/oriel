@@ -446,13 +446,17 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   // false triggers when assistant text entries arrive between tool calls)
   const prevRunningRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionsRequestedRef = useRef(false);
   useEffect(() => {
     const wasRunning = prevRunningRef.current;
     prevRunningRef.current = running;
 
-    if (wasRunning && !running && entries.length > 0) {
+    if (wasRunning && !running && entries.length > 0 && !suggestionsRequestedRef.current) {
       // Debounce: wait 2s to confirm session is truly idle
       idleTimerRef.current = setTimeout(() => {
+        if (suggestionsRequestedRef.current) return;
+        suggestionsRequestedRef.current = true;
+
         // Request suggestions
         const ws = wsRef.current;
         if (ws?.readyState === WebSocket.OPEN) {
@@ -477,10 +481,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       }, 2000);
     }
 
-    // Cancel debounce if running becomes true again
-    if (running && idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = null;
+    // Cancel debounce and reset guard if running becomes true again (user sent new message)
+    if (running) {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      suggestionsRequestedRef.current = false;
     }
 
     return () => {
