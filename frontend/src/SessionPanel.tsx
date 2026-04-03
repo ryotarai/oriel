@@ -98,7 +98,12 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     setCwdInput(cwd ?? "");
   }, [cwd]);
 
-  const [splitPct, setSplitPct] = useState(70);
+  const [splitPct, setSplitPct] = useState(() => {
+    // Default terminal height: 200px. Estimate initial split from window height.
+    const terminalDefaultHeight = 200;
+    const available = window.innerHeight;
+    return available > 0 ? Math.max(20, Math.min(90, ((available - terminalDefaultHeight) / available) * 100)) : 70;
+  });
   const dragging = useRef(false);
   const [activeTab, setActiveTab] = useState<"conversation" | "diff" | "files" | "commits">("conversation");
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
