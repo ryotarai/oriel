@@ -25,8 +25,8 @@ var upgrader = websocket.Upgrader{
 }
 
 var (
-	// "(no content)" — output by /clear
-	clearPattern = regexp.MustCompile(`\(no content\)`)
+	// Matches the /clear output: "⎿  (no content)" (includes non-breaking space \u00a0)
+	clearPattern = regexp.MustCompile(`⎿[\s\x{00a0}]+\(no content\)`)
 	// Strip ANSI escape sequences for pattern matching
 	ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[>\[?][0-9;]*[a-zA-Z]`)
 )
@@ -288,9 +288,9 @@ func (h *Handler) readPtyLoop(s *session) {
 		detectBuf.Write(data)
 		text := ansiPattern.ReplaceAllString(detectBuf.String(), "")
 
-		// Detect /clear: "(no content)" in output
+		// Detect /clear
 		if clearPattern.MatchString(text) {
-			slog.Debug("Detected /clear", "session", s.id)
+			slog.Debug("Detected /clear", "session", s.id, "detectBuf", text)
 			detectBuf.Reset()
 			select {
 			case s.restartCh <- restartRequest{}:
