@@ -603,7 +603,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
         {/* Tab content - all tabs always mounted, hidden when inactive */}
         <div className={`flex-1 flex flex-col min-h-0 relative ${activeTab !== "conversation" ? "hidden" : ""}`}>
-            <TaskOverlay tasks={tasks} />
+            <TaskOverlay tasks={tasks} searchOpen={searchOpen} />
             <div className="flex items-center px-3 py-1 border-b border-gray-800">
               <label className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 cursor-pointer select-none">
                 <input
@@ -1308,13 +1308,13 @@ function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
   );
 }
 
-function TaskOverlay({ tasks }: { tasks: TaskItem[] }) {
+function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
 
   if (tasks.length === 0) return null;
 
   return (
-    <div className="absolute top-10 right-2 z-10 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-lg backdrop-blur-sm overflow-hidden">
+    <div className={`absolute ${searchOpen ? "top-[5.5rem]" : "top-10"} right-2 z-10 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-lg backdrop-blur-sm overflow-hidden`}>
       <div className="px-3 py-1.5 border-b border-gray-700 flex items-center justify-between">
         <span className="text-xs font-medium text-gray-300">Tasks</span>
         <button
