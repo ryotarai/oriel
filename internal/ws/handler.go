@@ -89,7 +89,6 @@ type session struct {
 }
 
 type restartRequest struct {
-	resumeSessionID string // empty = fresh start, non-empty = --resume <id>
 }
 
 type editorResult struct {
@@ -231,7 +230,12 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	// Also cancel when PTY exits
 	go func() {
 		<-ptySess.Done()
-		watchCancel()
+		s.mu.Lock()
+		if s.cancelWatchConv != nil {
+			s.cancelWatchConv()
+			s.cancelWatchConv = nil
+		}
+		s.mu.Unlock()
 	}()
 	go h.watchConversation(s, watchCtx, "")
 
@@ -241,8 +245,8 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 }
 
 func (h *Handler) restartLoop(s *session) {
-	for req := range s.restartCh {
-		slog.Debug("Session restarting", "session", s.id, "resume", req.resumeSessionID)
+	for range s.restartCh {
+		slog.Debug("Session restarting", "session", s.id)
 
 		// Cancel the old watcher before closing the process
 		s.mu.Lock()
@@ -716,25 +720,24 @@ func (h *Handler) HandleSessionStart(w http.ResponseWriter, r *http.Request) {
 
 	// Handle clear and resume as soft resets: cancel old watcher, reset state, start new watcher.
 	// Do NOT restart the Claude process — the PTY keeps running.
+
+	// Create new watcher context before locking
+	newCtx, newCancel := context.WithCancel(context.Background())
+
 	s.mu.Lock()
 	if s.cancelWatchConv != nil {
 		s.cancelWatchConv()
-		s.cancelWatchConv = nil
 	}
 	s.convEpoch++
 	s.convHistory = nil
 	s.ptyOutputBuf = nil
 	s.claudeSessionID = body.SessionID
 	s.resumeSessionID = ""
+	s.cancelWatchConv = newCancel
 	epoch := s.convEpoch
 	s.mu.Unlock()
 
 	h.broadcast(s, message{Type: "conversation_reset", Epoch: epoch})
-
-	newCtx, newCancel := context.WithCancel(context.Background())
-	s.mu.Lock()
-	s.cancelWatchConv = newCancel
-	s.mu.Unlock()
 	go h.watchConversation(s, newCtx, body.TranscriptPath)
 }
 
