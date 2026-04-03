@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -349,14 +349,18 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   // Auto-scroll chat only when user is near the bottom
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isNearBottom.current) {
       const el = chatScrollRef.current;
       if (el) {
         programmaticScroll.current = true;
         el.scrollTop = el.scrollHeight;
         requestAnimationFrame(() => {
-          programmaticScroll.current = false;
+          // Second scroll to catch late layout changes (e.g., mermaid diagrams)
+          el.scrollTop = el.scrollHeight;
+          requestAnimationFrame(() => {
+            programmaticScroll.current = false;
+          });
         });
       }
     } else {
@@ -1082,8 +1086,88 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
 
     return (
       <div className="flex justify-start">
-        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-3 py-1.5 text-gray-100 text-sm whitespace-pre-wrap">
-          {entry.text}
+        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-3 py-1.5 text-sm
+          prose prose-invert prose-sm
+          prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
+          prose-p:text-gray-100 prose-p:leading-relaxed prose-p:my-1
+          prose-li:text-gray-100 prose-li:my-0
+          prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
+          prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
+          prose-a:text-blue-400
+          prose-strong:text-gray-100
+        ">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight]}
+            components={{
+              a: ({ children, href, ...props }) => (
+                <a
+                  {...props}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (href) {
+                      e.preventDefault();
+                      window.open(href, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                >
+                  {children}
+                </a>
+              ),
+              pre: ({ children, ...props }) => {
+                const extractText = (node: React.ReactNode): string => {
+                  if (typeof node === "string") return node;
+                  if (Array.isArray(node)) return node.map(extractText).join("");
+                  if (node && typeof node === "object" && "props" in node) {
+                    return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+                  }
+                  return "";
+                };
+                const text = extractText(children);
+                return (
+                  <div className="relative group/code">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(text)}
+                      className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
+                      title="Copy code"
+                    >
+                      Copy
+                    </button>
+                    <pre {...props}>{children}</pre>
+                  </div>
+                );
+              },
+              code: ({ children, className, ...props }) => {
+                if (className?.includes("language-mermaid")) {
+                  const chart = typeof children === "string" ? children : String(children ?? "");
+                  return <MermaidBlock chart={chart.trim()} />;
+                }
+                if (className) {
+                  return <code className={className} {...props}>{children}</code>;
+                }
+                const text = typeof children === "string" ? children : String(children ?? "");
+                if (onOpenFile && isFilePath(text)) {
+                  const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
+                  return (
+                    <code
+                      className="cursor-pointer hover:underline hover:text-blue-300"
+                      onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+                      title="Open in File Explorer"
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  );
+                }
+                return <code {...props}>{children}</code>;
+              },
+            }}
+          >
+            {entry.text}
+          </ReactMarkdown>
         </div>
       </div>
     );
@@ -1344,8 +1428,40 @@ function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
 
 function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const scheduledIds = useRef<Set<string>>(new Set());
 
-  if (tasks.length === 0) return null;
+  // Reset hidden/fading state when tasks are cleared (e.g. /clear, /new)
+  useEffect(() => {
+    if (tasks.length === 0) {
+      setFadingIds(new Set());
+      setHiddenIds(new Set());
+      scheduledIds.current.clear();
+    }
+  }, [tasks.length]);
+
+  // Schedule fade-out for newly completed tasks
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const task of tasks) {
+      if (task.status === "completed" && !scheduledIds.current.has(task.taskId)) {
+        scheduledIds.current.add(task.taskId);
+        const t1 = setTimeout(() => {
+          setFadingIds((prev) => new Set([...prev, task.taskId]));
+        }, 3000);
+        const t2 = setTimeout(() => {
+          setHiddenIds((prev) => new Set([...prev, task.taskId]));
+        }, 3500);
+        timers.push(t1, t2);
+      }
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [tasks]);
+
+  const visibleTasks = tasks.filter((t) => !hiddenIds.has(t.taskId));
+
+  if (visibleTasks.length === 0) return null;
 
   return (
     <div className={`absolute ${searchOpen ? "top-[5.5rem]" : "top-10"} right-2 z-10 w-64 bg-gray-900/95 border border-gray-700 rounded-lg shadow-lg backdrop-blur-sm overflow-hidden`}>
@@ -1361,8 +1477,11 @@ function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boo
       </div>
       {!collapsed && (
         <div className="max-h-48 overflow-y-auto">
-          {tasks.map((task) => (
-            <div key={task.taskId} className="px-3 py-1 flex items-center gap-2 text-xs">
+          {visibleTasks.map((task) => (
+            <div
+              key={task.taskId}
+              className={`px-3 py-1 flex items-center gap-2 text-xs transition-opacity duration-500 ${fadingIds.has(task.taskId) ? "opacity-0" : "opacity-100"}`}
+            >
               <span className={
                 task.status === "completed" ? "text-green-400" :
                 task.status === "in_progress" ? "text-yellow-400" :
