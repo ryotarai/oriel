@@ -65,39 +65,39 @@ jobs:
           SHA256_LINUX_ARM64=$(download_and_sha256 "oriel-linux-arm64")
 
           cat > homebrew-tap/Formula/oriel.rb <<FORMULA_END
-class Oriel < Formula
-  desc "Rich web UI for Claude Code"
-  homepage "https://github.com/ryotarai/oriel"
-  version "${VERSION}"
-  license "MIT"
+          class Oriel < Formula
+            desc "Rich web UI for Claude Code"
+            homepage "https://github.com/ryotarai/oriel"
+            version "${VERSION}"
+            license "MIT"
 
-  on_macos do
-    on_intel do
-      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-darwin-amd64"
-      sha256 "${SHA256_DARWIN_AMD64}"
-    end
-    on_arm do
-      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-darwin-arm64"
-      sha256 "${SHA256_DARWIN_ARM64}"
-    end
-  end
+            on_macos do
+              on_intel do
+                url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-darwin-amd64"
+                sha256 "${SHA256_DARWIN_AMD64}"
+              end
+              on_arm do
+                url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-darwin-arm64"
+                sha256 "${SHA256_DARWIN_ARM64}"
+              end
+            end
 
-  on_linux do
-    on_intel do
-      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-linux-amd64"
-      sha256 "${SHA256_LINUX_AMD64}"
-    end
-    on_arm do
-      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-linux-arm64"
-      sha256 "${SHA256_LINUX_ARM64}"
-    end
-  end
+            on_linux do
+              on_intel do
+                url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-linux-amd64"
+                sha256 "${SHA256_LINUX_AMD64}"
+              end
+              on_arm do
+                url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-linux-arm64"
+                sha256 "${SHA256_LINUX_ARM64}"
+              end
+            end
 
-  def install
-    bin.install stable.url.split("/").last => "oriel"
-  end
-end
-FORMULA_END
+            def install
+              bin.install stable.url.split("/").last => "oriel"
+            end
+          end
+          FORMULA_END
 
       - name: Commit and push updated formula
         env:
