@@ -1275,20 +1275,16 @@ function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onO
         <div className="relative">
           <div
             className={needsAccordion && !expanded ? "overflow-hidden" : ""}
-            style={needsAccordion && !expanded ? { maxHeight: `${AGENT_COLLAPSE_THRESHOLD}px` } : undefined}
+            style={needsAccordion && !expanded ? {
+              maxHeight: `${AGENT_COLLAPSE_THRESHOLD}px`,
+              maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+            } : undefined}
           >
             <div ref={contentRef}>
               <MarkdownContent text={entry.text} onOpenFile={onOpenFile} />
             </div>
           </div>
-          {needsAccordion && !expanded && (
-            <div
-              className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
-              style={{
-                background: "linear-gradient(to bottom, transparent, #1f2937)",
-              }}
-            />
-          )}
         </div>
         {needsAccordion && (
           <button
