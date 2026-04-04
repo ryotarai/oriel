@@ -1047,6 +1047,95 @@ function shouldShowTimestamp(prev: string | undefined, curr: string | undefined)
   return diff > 5 * 60 * 1000; // 5 minutes
 }
 
+const AGENT_COLLAPSE_THRESHOLD = 200;
+
+function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (path: string) => void }) {
+  return (
+    <div className="prose prose-invert prose-sm max-w-none
+      prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
+      prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
+      prose-li:text-gray-200 prose-li:my-0
+      prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
+      prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
+      prose-a:text-blue-400
+      prose-strong:text-gray-100
+    ">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          a: ({ children, href, ...props }) => (
+            <a
+              {...props}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (href) {
+                  e.preventDefault();
+                  window.open(href, "_blank", "noopener,noreferrer");
+                }
+              }}
+            >
+              {children}
+            </a>
+          ),
+          pre: ({ children, ...props }) => {
+            const extractText = (node: React.ReactNode): string => {
+              if (typeof node === "string") return node;
+              if (Array.isArray(node)) return node.map(extractText).join("");
+              if (node && typeof node === "object" && "props" in node) {
+                return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+              }
+              return "";
+            };
+            const text = extractText(children);
+            return (
+              <div className="relative group/code">
+                <button
+                  onClick={() => navigator.clipboard.writeText(text)}
+                  className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
+                  title="Copy code"
+                >
+                  Copy
+                </button>
+                <pre {...props}>{children}</pre>
+              </div>
+            );
+          },
+          code: ({ children, className, ...props }) => {
+            if (className?.includes("language-mermaid")) {
+              const chart = typeof children === "string" ? children : String(children ?? "");
+              return <MermaidBlock chart={chart.trim()} />;
+            }
+            if (className) {
+              return <code className={className} {...props}>{children}</code>;
+            }
+            const codeText = typeof children === "string" ? children : String(children ?? "");
+            if (onOpenFile && isFilePath(codeText)) {
+              const cleanPath = codeText.replace(/:\d+(-\d+)?$/, "");
+              return (
+                <code
+                  className="cursor-pointer hover:underline hover:text-blue-300"
+                  onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+                  title="Open in File Explorer"
+                  {...props}
+                >
+                  {children}
+                </code>
+              );
+            }
+            return <code {...props}>{children}</code>;
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") {
     return <ExitPlanModeBlock entry={entry} />;
@@ -1106,88 +1195,8 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
 
     return (
       <div className="flex justify-start">
-        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-3 py-1.5 text-sm
-          prose prose-invert prose-sm
-          prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
-          prose-p:text-gray-100 prose-p:leading-relaxed prose-p:my-1
-          prose-li:text-gray-100 prose-li:my-0
-          prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
-          prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
-          prose-a:text-blue-400
-          prose-strong:text-gray-100
-        ">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={{
-              a: ({ children, href, ...props }) => (
-                <a
-                  {...props}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (href) {
-                      e.preventDefault();
-                      window.open(href, "_blank", "noopener,noreferrer");
-                    }
-                  }}
-                >
-                  {children}
-                </a>
-              ),
-              pre: ({ children, ...props }) => {
-                const extractText = (node: React.ReactNode): string => {
-                  if (typeof node === "string") return node;
-                  if (Array.isArray(node)) return node.map(extractText).join("");
-                  if (node && typeof node === "object" && "props" in node) {
-                    return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
-                  }
-                  return "";
-                };
-                const text = extractText(children);
-                return (
-                  <div className="relative group/code">
-                    <button
-                      onClick={() => navigator.clipboard.writeText(text)}
-                      className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
-                      title="Copy code"
-                    >
-                      Copy
-                    </button>
-                    <pre {...props}>{children}</pre>
-                  </div>
-                );
-              },
-              code: ({ children, className, ...props }) => {
-                if (className?.includes("language-mermaid")) {
-                  const chart = typeof children === "string" ? children : String(children ?? "");
-                  return <MermaidBlock chart={chart.trim()} />;
-                }
-                if (className) {
-                  return <code className={className} {...props}>{children}</code>;
-                }
-                const text = typeof children === "string" ? children : String(children ?? "");
-                if (onOpenFile && isFilePath(text)) {
-                  const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
-                  return (
-                    <code
-                      className="cursor-pointer hover:underline hover:text-blue-300"
-                      onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
-                      title="Open in File Explorer"
-                      {...props}
-                    >
-                      {children}
-                    </code>
-                  );
-                }
-                return <code {...props}>{children}</code>;
-              },
-            }}
-          >
-            {entry.text}
-          </ReactMarkdown>
+        <div className="max-w-[85%] rounded-2xl bg-blue-900/40 border border-blue-800/50 px-3 py-1.5 text-sm">
+          <MarkdownContent text={entry.text} onOpenFile={onOpenFile} />
         </div>
       </div>
     );
@@ -1205,92 +1214,7 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeWidth="2"/>
         </svg>
       </button>
-      <div className="prose prose-invert prose-sm max-w-none
-        prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
-        prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
-        prose-li:text-gray-200 prose-li:my-0
-        prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
-        prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
-        prose-a:text-blue-400
-        prose-strong:text-gray-100
-      ">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-          components={{
-            a: ({ children, href, ...props }) => (
-              <a
-                {...props}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (href) {
-                    e.preventDefault();
-                    window.open(href, "_blank", "noopener,noreferrer");
-                  }
-                }}
-              >
-                {children}
-              </a>
-            ),
-            pre: ({ children, ...props }) => {
-              const extractText = (node: React.ReactNode): string => {
-                if (typeof node === "string") return node;
-                if (Array.isArray(node)) return node.map(extractText).join("");
-                if (node && typeof node === "object" && "props" in node) {
-                  return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
-                }
-                return "";
-              };
-              const text = extractText(children);
-              return (
-                <div className="relative group/code">
-                  <button
-                    onClick={() => navigator.clipboard.writeText(text)}
-                    className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
-                    title="Copy code"
-                  >
-                    Copy
-                  </button>
-                  <pre {...props}>{children}</pre>
-                </div>
-              );
-            },
-            code: ({ children, className, ...props }) => {
-              // Render mermaid diagrams
-              if (className?.includes("language-mermaid")) {
-                const chart = typeof children === "string" ? children : String(children ?? "");
-                return <MermaidBlock chart={chart.trim()} />;
-              }
-              // For code blocks (has language class), use default rendering
-              if (className) {
-                return <code className={className} {...props}>{children}</code>;
-              }
-              // For inline code, check if it looks like a file path
-              const text = typeof children === "string" ? children : String(children ?? "");
-              if (onOpenFile && isFilePath(text)) {
-                // Strip line number suffix like :42
-                const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
-                return (
-                  <code
-                    className="cursor-pointer hover:underline hover:text-blue-300"
-                    onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
-                    title="Open in File Explorer"
-                    {...props}
-                  >
-                    {children}
-                  </code>
-                );
-              }
-              return <code {...props}>{children}</code>;
-            },
-          }}
-        >
-          {entry.text}
-        </ReactMarkdown>
-      </div>
+      <MarkdownContent text={entry.text} onOpenFile={onOpenFile} />
     </div>
   );
 }
@@ -1299,21 +1223,23 @@ function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onO
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
   const [expanded, setExpanded] = useState(false);
-  const COLLAPSE_THRESHOLD = 200;
 
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const e of entries) {
-        setContentHeight(e.contentRect.height);
+        setContentHeight(prev => {
+          const h = e.contentRect.height;
+          return h === prev ? prev : h;
+        });
       }
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  const needsAccordion = contentHeight >= COLLAPSE_THRESHOLD;
+  const needsAccordion = contentHeight >= AGENT_COLLAPSE_THRESHOLD;
 
   return (
     <div className="my-1">
@@ -1324,91 +1250,10 @@ function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onO
         <div className="relative">
           <div
             className={needsAccordion && !expanded ? "overflow-hidden" : ""}
-            style={needsAccordion && !expanded ? { maxHeight: `${COLLAPSE_THRESHOLD}px` } : undefined}
+            style={needsAccordion && !expanded ? { maxHeight: `${AGENT_COLLAPSE_THRESHOLD}px` } : undefined}
           >
             <div ref={contentRef}>
-              <div className="prose prose-invert prose-sm max-w-none
-                prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
-                prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
-                prose-li:text-gray-200 prose-li:my-0
-                prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
-                prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
-                prose-a:text-blue-400
-                prose-strong:text-gray-100
-              ">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                  components={{
-                    a: ({ children, href, ...props }) => (
-                      <a
-                        {...props}
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (href) {
-                            e.preventDefault();
-                            window.open(href, "_blank", "noopener,noreferrer");
-                          }
-                        }}
-                      >
-                        {children}
-                      </a>
-                    ),
-                    pre: ({ children, ...props }) => {
-                      const extractText = (node: React.ReactNode): string => {
-                        if (typeof node === "string") return node;
-                        if (Array.isArray(node)) return node.map(extractText).join("");
-                        if (node && typeof node === "object" && "props" in node) {
-                          return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
-                        }
-                        return "";
-                      };
-                      const text = extractText(children);
-                      return (
-                        <div className="relative group/code">
-                          <button
-                            onClick={() => navigator.clipboard.writeText(text)}
-                            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
-                            title="Copy code"
-                          >
-                            Copy
-                          </button>
-                          <pre {...props}>{children}</pre>
-                        </div>
-                      );
-                    },
-                    code: ({ children, className, ...props }) => {
-                      if (className?.includes("language-mermaid")) {
-                        const chart = typeof children === "string" ? children : String(children ?? "");
-                        return <MermaidBlock chart={chart.trim()} />;
-                      }
-                      if (className) {
-                        return <code className={className} {...props}>{children}</code>;
-                      }
-                      const text = typeof children === "string" ? children : String(children ?? "");
-                      if (onOpenFile && isFilePath(text)) {
-                        const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
-                        return (
-                          <code
-                            className="cursor-pointer hover:underline hover:text-blue-300"
-                            onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
-                            title="Open in File Explorer"
-                            {...props}
-                          >
-                            {children}
-                          </code>
-                        );
-                      }
-                      return <code {...props}>{children}</code>;
-                    },
-                  }}
-                >
-                  {entry.text}
-                </ReactMarkdown>
-              </div>
+              <MarkdownContent text={entry.text} onOpenFile={onOpenFile} />
             </div>
           </div>
           {needsAccordion && !expanded && (
@@ -1448,22 +1293,7 @@ function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
           <span className="text-blue-400 font-medium">Plan</span>
         </div>
         {plan && (
-          <div className="prose prose-invert prose-sm max-w-none
-            prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
-            prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
-            prose-li:text-gray-200 prose-li:my-0
-            prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
-            prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
-            prose-a:text-blue-400
-            prose-strong:text-gray-100
-          ">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-            >
-              {plan}
-            </ReactMarkdown>
-          </div>
+          <MarkdownContent text={plan} />
         )}
       </div>
     </div>
