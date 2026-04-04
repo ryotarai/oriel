@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -119,9 +120,12 @@ type Handler struct {
 	sessions   map[string]*session
 }
 
-// shellEscape wraps a string in single quotes, escaping any single quotes within.
-func shellEscape(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+var validSessionIDRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// isValidSessionID reports whether id is a valid session ID.
+// Valid IDs match ^[a-zA-Z0-9_-]+$ (non-empty).
+func isValidSessionID(id string) bool {
+	return validSessionIDRe.MatchString(id)
 }
 
 func NewHandler(command string, listenAddr string, store *state.Store, token string) *Handler {
@@ -135,6 +139,10 @@ func NewHandler(command string, listenAddr string, store *state.Store, token str
 }
 
 func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*session, error) {
+	if !isValidSessionID(id) {
+		return nil, fmt.Errorf("invalid session ID: %q", id)
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -192,7 +200,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	// Create a hook script that includes the auth token
 	hookScriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id))
 	hookScriptContent := fmt.Sprintf("#!/bin/sh\ncurl -s -X POST -H 'Content-Type: application/json' -b 'oriel-token=%s' -d @- \"http://%s/api/sessions/%s/$1\"\n",
-		shellEscape(h.token), h.listenAddr, shellEscape(s.id))
+		h.token, h.listenAddr, s.id)
 	if err := os.WriteFile(hookScriptPath, []byte(hookScriptContent), 0700); err != nil {
 		return fmt.Errorf("write hooks script: %w", err)
 	}
@@ -215,7 +223,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	}
 	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id))
 	scriptContent := fmt.Sprintf("#!/bin/sh\nexec %s editor --url http://%s --session %s --token %s \"$@\"\n",
-		shellEscape(selfPath), h.listenAddr, shellEscape(s.id), shellEscape(h.token))
+		selfPath, h.listenAddr, s.id, h.token)
 	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0700); err != nil {
 		return fmt.Errorf("write editor script: %w", err)
 	}
@@ -545,6 +553,12 @@ func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("HandleHook called", "method", r.Method, "path", r.URL.Path)
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) >= 4 {
+		sessionID := parts[2]
+		if !isValidSessionID(sessionID) {
+			slog.Warn("HandleHook: invalid session ID", "sessionID", sessionID)
+			http.Error(w, "invalid session id", http.StatusBadRequest)
+			return
+		}
 		switch parts[3] {
 		case "idle":
 			h.HandleIdle(w, r)
@@ -580,6 +594,10 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sessionID := parts[2]
+	if !isValidSessionID(sessionID) {
+		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
 
 	// Parse hook payload
 	var payload struct {
@@ -660,6 +678,10 @@ func (h *Handler) HandleEditorOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sessionID := parts[2]
+	if !isValidSessionID(sessionID) {
+		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
 
 	var payload struct {
 		Content string `json:"content"`
@@ -722,6 +744,10 @@ func (h *Handler) HandleSessionStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sessionID := parts[2]
+	if !isValidSessionID(sessionID) {
+		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
 
 	h.mu.Lock()
 	s, ok := h.sessions[sessionID]
@@ -780,6 +806,10 @@ func (h *Handler) HandlePromptSubmitted(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	sessionID := parts[2]
+	if !isValidSessionID(sessionID) {
+		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
 
 	h.mu.Lock()
 	s, ok := h.sessions[sessionID]
@@ -990,6 +1020,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("session")
 	if sessionID == "" {
 		sessionID = "default"
+	}
+	if !isValidSessionID(sessionID) {
+		slog.Warn("ServeHTTP: invalid session ID", "sessionID", sessionID)
+		conn.WriteJSON(message{Type: "error", Data: "invalid session id"})
+		return
 	}
 
 	cwd := r.URL.Query().Get("cwd")
