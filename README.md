@@ -9,7 +9,7 @@ A rich web UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 - **Live diff viewer** -- See every file change as Claude works, with syntax highlighting and line-by-line references
 - **Parallel sessions** -- Run multiple Claude Code panes side by side, each with its own terminal and working directory
 - **Reply suggestions** -- One-click follow-up suggestions appear after each response
-- **Session resume** -- Pick up any previous conversation with one click; layout and context are fully restored
+- **Session resume** -- Pick up any previous conversation by typing `/resume`; layout and context are fully restored
 - **Readable conversation** -- Markdown rendering, Mermaid diagrams, inline agent results, syntax highlighting, and clickable file paths
 - **File explorer & commit history** -- Browse code and review git commits without leaving the browser
 
@@ -71,7 +71,7 @@ Organize your work into tabs, each containing one or more Claude Code panes. Dra
 
 ### Session Resume
 
-Click the resume button in the toolbar to pick up a previous conversation. Oriel restores the terminal output, conversation history, and session context so you can continue exactly where you left off.
+Type `/resume` in the terminal to pick up a previous conversation. Oriel restores the terminal output, conversation history, and session context so you can continue exactly where you left off.
 
 ### Persistent Workspace
 
@@ -89,7 +89,7 @@ Each pane can target a different project directory. Click the folder icon in the
 |----------|--------|
 | **Enter** | Newline (multiline input) |
 | **Cmd/Ctrl + Enter** | Submit to Claude |
-| **Ctrl + G** | Toggle textarea mode for multiline input |
+| **Ctrl + G** | Open web textarea editor (pre-populated with current input) |
 | **r** (with text selected) | Quote-reply selected text in the terminal |
 
 > Enter/Cmd+Enter behavior can be swapped in Settings.

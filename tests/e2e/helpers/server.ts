@@ -9,6 +9,7 @@ export interface OrielServer {
   port: number;
   token: string;
   stateDbPath: string;
+  logs: string[];
   stop: () => Promise<void>;
 }
 
@@ -43,6 +44,7 @@ export async function startOriel(opts?: {
   }
 
   let token = "";
+  const logs: string[] = [];
 
   // Start from project root so Claude uses the correct CWD for session/history lookup
   const projectRoot = path.resolve(__dirname, "../../..");
@@ -51,6 +53,7 @@ export async function startOriel(opts?: {
     "-listen-addr", addr,
     "-state-db", stateDbPath,
     "-no-open",
+    "-log-level", "debug",
   ], {
     stdio: ["ignore", "pipe", "pipe"],
     cwd: projectRoot,
@@ -62,6 +65,7 @@ export async function startOriel(opts?: {
 
     const onData = (data: Buffer) => {
       const line = data.toString();
+      logs.push(line);
       const match = line.match(/token=([a-f0-9]+)/);
       if (match) {
         token = match[1];
@@ -85,6 +89,7 @@ export async function startOriel(opts?: {
     port,
     token,
     stateDbPath,
+    logs,
     stop: async () => {
       if (proc.exitCode === null) {
         proc.kill("SIGTERM");

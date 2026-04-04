@@ -31,6 +31,7 @@ func (h *Handler) generateSuggestions(claudeSessionID string, cwd string) ([]sug
 	cmd := exec.CommandContext(ctx, h.command,
 		"--resume", claudeSessionID,
 		"--fork-session",
+		"--model", "haiku",
 		"-p",
 		"--output-format", "json",
 		"--json-schema", suggestionsJSONSchema,
