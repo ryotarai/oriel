@@ -21,6 +21,12 @@ A rich web UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page and place it somewhere in your PATH.
 
+Or install with [mise](https://mise.jdx.dev/):
+
+```bash
+mise use -g github:ryotarai/oriel
+```
+
 To build from source instead:
 
 ```bash
