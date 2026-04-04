@@ -1069,13 +1069,16 @@ function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (pat
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={{
-          a: ({ children, href, ...props }) => (
+          a: ({ children, href }) => (
             <a
-              {...props}
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (href) window.open(href, "_blank", "noopener,noreferrer");
+              }}
             >
               {children}
             </a>
