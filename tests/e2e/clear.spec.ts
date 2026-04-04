@@ -92,17 +92,16 @@ test.describe("/clear command resets conversation", () => {
     await clearWsMessages(page);
 
     const hookUrl = `http://127.0.0.1:${server.port}/api/sessions/${sessionId}/session-start`;
-    const resp = await page.evaluate(async ({ url, token }) => {
+    const resp = await page.evaluate(async (url) => {
       const r = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cookie": `oriel-token=${token}`,
         },
         body: JSON.stringify({ source: "clear", hook_event_name: "SessionStart" }),
       });
       return { status: r.status, body: await r.text() };
-    }, { url: hookUrl, token: server.token });
+    }, hookUrl);
 
     console.log("Hook response:", resp);
     expect(resp.status).toBe(200);
