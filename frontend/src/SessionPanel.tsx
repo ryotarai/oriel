@@ -511,6 +511,20 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, textareaMode, isFocused]);
 
+  // Active tool entry computation
+  const activeToolEntry = useMemo(() => {
+    if (showTools || !running) return null;
+    const last = entries[entries.length - 1];
+    if (!last) return null;
+    const ignored = ["TaskCreate", "TaskUpdate", "ExitPlanMode"];
+    if (last.type === "tool_use" && !ignored.includes(last.toolName ?? "")) return last;
+    if (last.type === "tool_result") {
+      const use = entries.find((e) => e.type === "tool_use" && e.toolUseId === last.toolUseId);
+      if (use && !ignored.includes(use.toolName ?? "")) return use;
+    }
+    return null;
+  }, [entries, showTools, running]);
+
   // Search match computation
   const searchMatches = useMemo(() => {
     if (!searchQuery) return [];
@@ -758,23 +772,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                 );
               })}
               {/* Active tool indicator: show even when tools are hidden */}
-              {!showTools && running && (() => {
-                const lastEntry = entries[entries.length - 1];
-                if (!lastEntry) return null;
-                if (lastEntry.type === "tool_use") {
-                  if (lastEntry.toolName === "TaskCreate" || lastEntry.toolName === "TaskUpdate" || lastEntry.toolName === "ExitPlanMode") return null;
-                  return <ActiveToolIndicator key="active-tool" entry={lastEntry} />;
-                }
-                if (lastEntry.type === "tool_result") {
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === lastEntry.toolUseId
-                  );
-                  if (matchingUse && matchingUse.toolName !== "TaskCreate" && matchingUse.toolName !== "TaskUpdate" && matchingUse.toolName !== "ExitPlanMode") {
-                    return <ActiveToolIndicator key="active-tool" entry={matchingUse} />;
-                  }
-                }
-                return null;
-              })()}
+              {activeToolEntry && <ActiveToolIndicator entry={activeToolEntry} />}
               <div ref={chatEndRef} />
               {/* Reply suggestions */}
               {suggestionsLoading && (
@@ -1388,7 +1386,7 @@ function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span className="text-green-400 font-medium">{entry.toolName}</span>
+          <span className="text-green-400 font-medium">{entry.toolName ?? "unknown"}</span>
           <span className="text-gray-400 truncate">{summary}</span>
         </div>
       </div>
