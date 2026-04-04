@@ -8,25 +8,37 @@ A rich web UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 - **Live diff viewer** -- See every file change as Claude works, with syntax highlighting and line-by-line references
 - **Parallel sessions** -- Run multiple Claude Code panes side by side, each with its own terminal and working directory
-- **Reply suggestions** -- One-click follow-up suggestions appear after each response
+- **Reply suggestions** -- One-click follow-up suggestions appear automatically after each response
 - **Session resume** -- Pick up any previous conversation by typing `/resume`; layout and context are fully restored
 - **Readable conversation** -- Markdown rendering, Mermaid diagrams, inline agent results, syntax highlighting, and clickable file paths
 - **File explorer & commit history** -- Browse code and review git commits without leaving the browser
+- **Web editor integration** -- Edit files in a browser-based textarea when Claude invokes `$EDITOR`
+- **Persistent workspace** -- Tab layout, pane sizes, and sessions survive browser closes and server restarts
 
 ## Quick Start
 
 ### Install
 
-Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page, or build from source:
+Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page.
+
+Or install with Go:
+
+```bash
+go install github.com/ryotarai/oriel/cmd/oriel@latest
+```
+
+Or build from source:
 
 ```bash
 git clone https://github.com/ryotarai/oriel.git
 cd oriel
-make build        # requires Go 1.24+ and Node.js 18+
+make build        # requires Go 1.26+ and Node.js 18+
 # produces ./bin/oriel
 ```
 
-**Prerequisite:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and available as `claude` in your PATH.
+**Prerequisite:** [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI must be installed and available as `claude` in your PATH.
+
+**Supported platforms:** macOS (Apple Silicon, Intel), Linux (x86_64, ARM64)
 
 ### Run
 
@@ -81,9 +93,13 @@ Your tab layout, pane sizes, working directories, and session associations are s
 
 Each pane can target a different project directory. Click the folder icon in the toolbar to change it. Oriel also auto-detects when Claude enters a git worktree and updates the diff/files/commits views accordingly.
 
-### Keyboard Shortcuts
+### Web Editor Integration
 
-#### Terminal Input
+When Claude invokes `$EDITOR` (e.g., for interactive file editing), Oriel opens a browser-based textarea editor. Edit the content in the browser, submit, and the result is returned to Claude -- no terminal-based editor required.
+
+## Keyboard Shortcuts
+
+### Terminal Input
 
 | Shortcut | Action |
 |----------|--------|
@@ -94,7 +110,7 @@ Each pane can target a different project directory. Click the folder icon in the
 
 > Enter/Cmd+Enter behavior can be swapped in Settings.
 
-#### Navigation
+### Navigation
 
 | Shortcut | Action |
 |----------|--------|
@@ -102,7 +118,7 @@ Each pane can target a different project directory. Click the folder icon in the
 | **Cmd/Ctrl + 1-9** | Focus pane by number |
 | **Shift + Cmd/Ctrl + 1-9** | Switch to tab by number |
 
-#### Conversation
+### Conversation
 
 | Shortcut | Action |
 |----------|--------|
