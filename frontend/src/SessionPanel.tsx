@@ -1285,7 +1285,7 @@ function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onO
             <div
               className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
               style={{
-                background: "linear-gradient(to bottom, transparent, rgba(31, 41, 55, 0.6))",
+                background: "linear-gradient(to bottom, transparent, #1f2937)",
               }}
             />
           )}
