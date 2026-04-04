@@ -13,7 +13,9 @@ make build
 
 ## Git Workflow
 
-After completing work, automatically commit the changes with proper logical units. Group related changes into separate commits rather than making one large commit.
+- Direct pushes to `main` are not allowed. Always create a PR.
+- When modifying files, create a git worktree (use the `EnterWorktree` tool) and do all work there.
+- After completing work, automatically commit the changes with proper logical units. Group related changes into separate commits rather than making one large commit.
 
 ## Temporary Files
 
