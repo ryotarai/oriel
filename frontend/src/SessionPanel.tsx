@@ -763,10 +763,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                       id={`msg-${entry.uuid}`}
                       className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
                     >
-                      <MessageBubble
-                        entry={isAgentResult ? { ...entry, type: "assistant", role: "assistant" } : entry}
-                        onOpenFile={openFileInExplorer}
-                      />
+                      {isAgentResult ? (
+                        <AgentResultBlock entry={entry} onOpenFile={openFileInExplorer} />
+                      ) : (
+                        <MessageBubble
+                          entry={entry}
+                          onOpenFile={openFileInExplorer}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -1286,6 +1290,144 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
         >
           {entry.text}
         </ReactMarkdown>
+      </div>
+    </div>
+  );
+}
+
+function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState<number>(0);
+  const [expanded, setExpanded] = useState(false);
+  const COLLAPSE_THRESHOLD = 200;
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        setContentHeight(e.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const needsAccordion = contentHeight >= COLLAPSE_THRESHOLD;
+
+  return (
+    <div className="my-1">
+      <div className="rounded-lg bg-gray-800/60 border border-gray-700/50 px-3 py-2">
+        <div className="flex items-center gap-2 text-xs mb-2">
+          <span className="text-green-400 font-medium">Agent</span>
+        </div>
+        <div className="relative">
+          <div
+            className={needsAccordion && !expanded ? "overflow-hidden" : ""}
+            style={needsAccordion && !expanded ? { maxHeight: `${COLLAPSE_THRESHOLD}px` } : undefined}
+          >
+            <div ref={contentRef}>
+              <div className="prose prose-invert prose-sm max-w-none
+                prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
+                prose-p:text-gray-200 prose-p:leading-relaxed prose-p:my-1
+                prose-li:text-gray-200 prose-li:my-0
+                prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-1 prose-code:rounded prose-code:text-xs
+                prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:my-2
+                prose-a:text-blue-400
+                prose-strong:text-gray-100
+              ">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                  components={{
+                    a: ({ children, href, ...props }) => (
+                      <a
+                        {...props}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (href) {
+                            e.preventDefault();
+                            window.open(href, "_blank", "noopener,noreferrer");
+                          }
+                        }}
+                      >
+                        {children}
+                      </a>
+                    ),
+                    pre: ({ children, ...props }) => {
+                      const extractText = (node: React.ReactNode): string => {
+                        if (typeof node === "string") return node;
+                        if (Array.isArray(node)) return node.map(extractText).join("");
+                        if (node && typeof node === "object" && "props" in node) {
+                          return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+                        }
+                        return "";
+                      };
+                      const text = extractText(children);
+                      return (
+                        <div className="relative group/code">
+                          <button
+                            onClick={() => navigator.clipboard.writeText(text)}
+                            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
+                            title="Copy code"
+                          >
+                            Copy
+                          </button>
+                          <pre {...props}>{children}</pre>
+                        </div>
+                      );
+                    },
+                    code: ({ children, className, ...props }) => {
+                      if (className?.includes("language-mermaid")) {
+                        const chart = typeof children === "string" ? children : String(children ?? "");
+                        return <MermaidBlock chart={chart.trim()} />;
+                      }
+                      if (className) {
+                        return <code className={className} {...props}>{children}</code>;
+                      }
+                      const text = typeof children === "string" ? children : String(children ?? "");
+                      if (onOpenFile && isFilePath(text)) {
+                        const cleanPath = text.replace(/:\d+(-\d+)?$/, "");
+                        return (
+                          <code
+                            className="cursor-pointer hover:underline hover:text-blue-300"
+                            onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+                            title="Open in File Explorer"
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
+                      }
+                      return <code {...props}>{children}</code>;
+                    },
+                  }}
+                >
+                  {entry.text}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+          {needsAccordion && !expanded && (
+            <div
+              className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none"
+              style={{
+                background: "linear-gradient(to bottom, transparent, rgba(31, 41, 55, 0.6))",
+              }}
+            />
+          )}
+        </div>
+        {needsAccordion && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
+        )}
       </div>
     </div>
   );
