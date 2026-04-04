@@ -16,7 +16,7 @@ interface CommitDetail {
   diff: string;
 }
 
-export function CommitsPanel({ cwd }: { cwd?: string }) {
+export function CommitsPanel({ cwd, refreshTrigger }: { cwd?: string; refreshTrigger?: number }) {
   const [commits, setCommits] = useState<CommitSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<CommitDetail | null>(null);
@@ -29,7 +29,7 @@ export function CommitsPanel({ cwd }: { cwd?: string }) {
       .then((r) => r.json())
       .then((data) => setCommits(data ?? []))
       .catch(() => {});
-  }, [cwd]);
+  }, [cwd, refreshTrigger]);
 
   const selectCommit = useCallback((hash: string) => {
     setSelected(hash);

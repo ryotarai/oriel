@@ -250,7 +250,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setSuggestionsLoading(false);
         } else if (msg.type === "files_changed") {
           fetchDiffDataRef.current();
-          setFileRefreshTrigger(c => c + 1);
+          setRefreshTrigger(c => c + 1);
         } else if (msg.type === "editor_open") {
           setEditorMode(true);
           setTextareaMode(true);
@@ -566,8 +566,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const fetchDiffDataRef = useRef(fetchDiffData);
   useEffect(() => { fetchDiffDataRef.current = fetchDiffData; }, [fetchDiffData]);
 
-  // Counter to trigger FileExplorer tree refresh on file changes
-  const [fileRefreshTrigger, setFileRefreshTrigger] = useState(0);
+  // Counter to trigger FileExplorer and CommitsPanel refresh on file changes
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     fetchDiffData();
@@ -831,10 +831,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "commits" ? "hidden" : ""}`}>
-            <CommitsPanel cwd={effectiveDir || undefined} />
+            <CommitsPanel cwd={effectiveDir || undefined} refreshTrigger={refreshTrigger} />
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "files" ? "hidden" : ""}`}>
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} refreshTrigger={fileRefreshTrigger} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} refreshTrigger={refreshTrigger} />
           </div>
       </div>
 
