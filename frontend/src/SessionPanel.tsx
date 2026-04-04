@@ -994,6 +994,11 @@ function parseSlashCommand(text: string): { name: string; args: string } | null 
   };
 }
 
+function parseLocalCommandStdout(text: string): string | null {
+  const match = text.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
+  return match ? match[1] : null;
+}
+
 function parseBashTags(text: string): BashParts | null {
   const inputMatch = text.match(/<bash-input>([\s\S]*?)<\/bash-input>/);
   const stdoutMatch = text.match(/<bash-stdout>([\s\S]*?)<\/bash-stdout>/);
@@ -1104,6 +1109,11 @@ function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (pat
               </div>
             );
           },
+          table: ({ children, ...props }) => (
+            <div className="overflow-x-auto max-w-full">
+              <table {...props}>{children}</table>
+            </div>
+          ),
           code: ({ children, className, ...props }) => {
             if (className?.includes("language-mermaid")) {
               const chart = typeof children === "string" ? children : String(children ?? "");
@@ -1182,6 +1192,21 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
           <div className="inline-flex items-center gap-1 rounded-full bg-gray-800 border border-gray-700 px-3 py-1 text-xs text-gray-400">
             <span className="font-mono">{slashCmd.name}</span>
             {slashCmd.args && <span className="text-gray-500">{slashCmd.args}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    // Render local-command-stdout as monospace output block
+    const localStdout = parseLocalCommandStdout(entry.text);
+    if (localStdout !== null) {
+      return (
+        <div className="my-1">
+          <div className="rounded-lg bg-gray-900 border border-gray-700/50 overflow-hidden text-xs font-mono">
+            <div className="px-3 py-1 bg-gray-800/60 border-b border-gray-700/50 text-gray-500 text-[10px]">Output</div>
+            {localStdout.trim() && (
+              <div className="px-3 py-1.5 text-gray-300 whitespace-pre-wrap">{localStdout.trim()}</div>
+            )}
           </div>
         </div>
       );
