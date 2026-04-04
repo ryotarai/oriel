@@ -132,14 +132,25 @@ export function FileExplorer({ requestedPath, onSendInput, cwd, changedPaths, re
               <div className="flex flex-col h-full">
                 <div className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/50 flex items-center">
                   <span className="truncate">{selectedPath}</span>
-                  {isMarkdownFile(selectedPath) && (
-                    <button
-                      onClick={() => setRenderMarkdown(!renderMarkdown)}
-                      className="ml-auto flex-shrink-0 text-xs text-gray-500 hover:text-gray-300 px-2 py-0.5 rounded border border-gray-700 hover:border-gray-600"
+                  <span className="ml-auto flex-shrink-0 flex items-center gap-1.5">
+                    {isMarkdownFile(selectedPath) && (
+                      <button
+                        onClick={() => setRenderMarkdown(!renderMarkdown)}
+                        className="text-xs text-gray-500 hover:text-gray-300 px-2 py-0.5 rounded border border-gray-700 hover:border-gray-600"
+                      >
+                        {renderMarkdown ? "Raw" : "Preview"}
+                      </button>
+                    )}
+                    <a
+                      href={`vscode://file${selectedPath.startsWith("/") ? selectedPath : `/${cwd || ""}/${selectedPath}`}`}
+                      className="text-gray-500 hover:text-gray-300 px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-600 inline-flex items-center"
+                      title="Open in VS Code"
                     >
-                      {renderMarkdown ? "Raw" : "Preview"}
-                    </button>
-                  )}
+                      <svg width="12" height="12" viewBox="0 0 100 100" fill="currentColor">
+                        <path d="M70.8 6.8L29.3 42.5 12.7 29.8 4.5 33.5v33l8.2 3.7 16.6-12.7L70.8 93.2 95.5 82V18L70.8 6.8zM29.3 61.5l-12.5 9.5V29l12.5 9.5v23zm41.5 14.3L49.5 58.5l21.3-17.3v34.6z"/>
+                      </svg>
+                    </a>
+                  </span>
                 </div>
                 <div className="flex-1 overflow-auto">
                   {isBinary ? (
