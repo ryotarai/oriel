@@ -37,6 +37,7 @@ func main() {
 	noOpen := flag.Bool("no-open", false, "Don't auto-open browser on startup")
 	stateDB := flag.String("state-db", "", "Path to state database (default: ~/.config/oriel/state.sqlite3)")
 	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+	tokenFile := flag.String("token-file", "", "Path to file containing auth token (token is read from file; file is created with a generated token if it does not exist)")
 	flag.Parse()
 
 	// Parse log level
@@ -89,7 +90,24 @@ func main() {
 	}
 	defer store.Close()
 
-	token := auth.GenerateToken()
+	var token string
+	if *tokenFile != "" {
+		data, err := os.ReadFile(*tokenFile)
+		if os.IsNotExist(err) {
+			token = auth.GenerateToken()
+			if err := os.WriteFile(*tokenFile, []byte(token), 0o600); err != nil {
+				slog.Error("Failed to write token file", "path", *tokenFile, "error", err)
+				os.Exit(1)
+			}
+		} else if err != nil {
+			slog.Error("Failed to read token file", "path", *tokenFile, "error", err)
+			os.Exit(1)
+		} else {
+			token = strings.TrimSpace(string(data))
+		}
+	} else {
+		token = auth.GenerateToken()
+	}
 
 	handler := ws.NewHandler(*command, *listenAddr, store, token)
 
