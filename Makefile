@@ -13,7 +13,11 @@ build-all: frontend-build
 		GOOS=$$os GOARCH=$$arch go build -o bin/oriel-$${os}-$${arch} ./cmd/oriel/; \
 	done
 
-frontend-build:
+frontend/node_modules: frontend/package.json frontend/package-lock.json
+	cd frontend && npm install
+	touch frontend/node_modules
+
+frontend-build: frontend/node_modules
 	cd frontend && npm run build
 
 test: test-go test-frontend test-e2e
@@ -21,13 +25,18 @@ test: test-go test-frontend test-e2e
 test-go:
 	go test ./... -v -count=1
 
-test-frontend:
+test-frontend: frontend/node_modules
 	cd frontend && npx vitest run
 
-test-e2e: build
+tests/e2e/node_modules: tests/e2e/package.json tests/e2e/package-lock.json
+	cd tests/e2e && npm install
+	touch tests/e2e/node_modules
+
+test-e2e: build tests/e2e/node_modules
 	cd tests/e2e && npx playwright test
 
 clean:
-	rm -f bin/oriel
 	rm -rf bin
 	rm -rf frontend/dist
+	rm -rf frontend/node_modules
+	rm -rf tests/e2e/node_modules
