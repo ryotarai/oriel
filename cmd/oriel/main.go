@@ -91,7 +91,7 @@ func main() {
 
 	token := auth.GenerateToken()
 
-	handler := ws.NewHandler(*command, *listenAddr, store)
+	handler := ws.NewHandler(*command, *listenAddr, store, token)
 
 	distFS, err := fs.Sub(frontend.Dist, "dist")
 	if err != nil {
@@ -104,7 +104,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", handler.ServeHTTP)
 	mux.HandleFunc("/api/sessions", handler.HandleListSessions)
-	mux.HandleFunc("/api/noauth/sessions/", handler.HandleHook) // Claude Code hook endpoints
+	mux.HandleFunc("/api/sessions/", handler.HandleHook) // Claude Code hook endpoints
 	mux.HandleFunc("/api/diff", handler.HandleDiff)
 	mux.HandleFunc("/api/dirs", fileexplorer.HandleDirs)
 	mux.HandleFunc("/api/files/tree", fileexplorer.HandleTree)
@@ -205,11 +205,12 @@ func runEditor() {
 	fs := flag.NewFlagSet("editor", flag.ExitOnError)
 	urlFlag := fs.String("url", "", "Backend URL")
 	sessionFlag := fs.String("session", "", "Session ID")
+	tokenFlag := fs.String("token", "", "Auth token")
 	fs.Parse(os.Args[2:])
 
 	tempfile := fs.Arg(0)
 	if tempfile == "" {
-		fmt.Fprintln(os.Stderr, "usage: oriel editor --url <url> --session <id> <file>")
+		fmt.Fprintln(os.Stderr, "usage: oriel editor --url <url> --session <id> --token <token> <file>")
 		os.Exit(1)
 	}
 
@@ -223,8 +224,15 @@ func runEditor() {
 		"content": string(content),
 	})
 
-	editorURL := fmt.Sprintf("%s/api/noauth/sessions/%s/editor-open", *urlFlag, *sessionFlag)
-	resp, err := http.Post(editorURL, "application/json", bytes.NewReader(body))
+	editorURL := fmt.Sprintf("%s/api/sessions/%s/editor-open", *urlFlag, *sessionFlag)
+	req, err := http.NewRequest(http.MethodPost, editorURL, bytes.NewReader(body))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create request: %v\n", err)
+		os.Exit(1)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", "oriel-token="+*tokenFlag)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to contact backend: %v\n", err)
 		os.Exit(1)

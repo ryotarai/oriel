@@ -114,15 +114,17 @@ type Handler struct {
 	command    string
 	listenAddr string
 	store      *state.Store
+	token      string
 	mu         sync.Mutex
 	sessions   map[string]*session
 }
 
-func NewHandler(command string, listenAddr string, store *state.Store) *Handler {
+func NewHandler(command string, listenAddr string, store *state.Store, token string) *Handler {
 	return &Handler{
 		command:    command,
 		listenAddr: listenAddr,
 		store:      store,
+		token:      token,
 		sessions:   make(map[string]*session),
 	}
 }
@@ -182,13 +184,20 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
 
+	// Create a hook script that includes the auth token
+	hookScriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id))
+	hookScriptContent := fmt.Sprintf("#!/bin/sh\ncurl -s -X POST -H 'Content-Type: application/json' -b 'oriel-token=%s' -d @- \"http://%s/api/sessions/%s/$1\"\n",
+		h.token, h.listenAddr, s.id)
+	if err := os.WriteFile(hookScriptPath, []byte(hookScriptContent), 0700); err != nil {
+		return fmt.Errorf("write hooks script: %w", err)
+	}
+
 	// Inject hooks via --settings
-	baseURL := fmt.Sprintf("http://%s/api/noauth/sessions/%s", h.listenAddr, s.id)
 	settingsJSON := fmt.Sprintf(`{"hooks":{`+
-		`"Stop":[{"hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/idle"}]}],`+
-		`"SessionStart":[{"matcher":"clear|resume","hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/session-start"}]}],`+
-		`"UserPromptSubmit":[{"hooks":[{"type":"command","command":"curl -s -X POST -H 'Content-Type: application/json' -d @- %s/prompt-submitted"}]}]`+
-		`}}`, baseURL, baseURL, baseURL)
+		`"Stop":[{"hooks":[{"type":"command","command":"%s idle"}]}],`+
+		`"SessionStart":[{"matcher":"clear|resume","hooks":[{"type":"command","command":"%s session-start"}]}],`+
+		`"UserPromptSubmit":[{"hooks":[{"type":"command","command":"%s prompt-submitted"}]}]`+
+		`}}`, hookScriptPath, hookScriptPath, hookScriptPath)
 	slog.Debug("startProcess: injecting --settings", "settings", settingsJSON, "session", s.id)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
@@ -200,9 +209,9 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 		return fmt.Errorf("os.Executable: %w", err)
 	}
 	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id))
-	scriptContent := fmt.Sprintf("#!/bin/sh\nexec %s editor --url http://%s --session %s \"$@\"\n",
-		selfPath, h.listenAddr, s.id)
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+	scriptContent := fmt.Sprintf("#!/bin/sh\nexec %s editor --url http://%s --session %s --token %s \"$@\"\n",
+		selfPath, h.listenAddr, s.id, h.token)
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0700); err != nil {
 		return fmt.Errorf("write editor script: %w", err)
 	}
 	extraEnv := []string{
@@ -294,6 +303,9 @@ func (h *Handler) readPtyLoop(s *session) {
 			s.mu.Lock()
 			s.exited = true
 			s.mu.Unlock()
+			// Clean up temp scripts for this session
+			os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id)))
+			os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id)))
 			return
 		}
 
@@ -515,12 +527,12 @@ func (h *Handler) broadcast(s *session, msg message) {
 	}
 }
 
-// HandleHook dispatches /api/noauth/sessions/{id}/{action} to the appropriate handler.
+// HandleHook dispatches /api/sessions/{id}/{action} to the appropriate handler.
 func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("HandleHook called", "method", r.Method, "path", r.URL.Path)
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) >= 5 {
-		switch parts[4] {
+	if len(parts) >= 4 {
+		switch parts[3] {
 		case "idle":
 			h.HandleIdle(w, r)
 			return
@@ -548,13 +560,13 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract oriel session ID from URL path: /api/noauth/sessions/{id}/idle
+	// Extract oriel session ID from URL path: /api/sessions/{id}/idle
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 || parts[0] != "api" || parts[1] != "noauth" || parts[2] != "sessions" || parts[4] != "idle" {
+	if len(parts) < 4 || parts[0] != "api" || parts[1] != "sessions" || parts[3] != "idle" {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	sessionID := parts[3]
+	sessionID := parts[2]
 
 	// Parse hook payload
 	var payload struct {
@@ -630,11 +642,11 @@ func (h *Handler) HandleEditorOpen(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 {
+	if len(parts) < 4 {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	sessionID := parts[3]
+	sessionID := parts[2]
 
 	var payload struct {
 		Content string `json:"content"`
@@ -690,13 +702,13 @@ func (h *Handler) HandleSessionStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract oriel session ID from URL path: /api/noauth/sessions/{id}/session-start
+	// Extract oriel session ID from URL path: /api/sessions/{id}/session-start
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 || parts[0] != "api" || parts[1] != "noauth" || parts[2] != "sessions" || parts[4] != "session-start" {
+	if len(parts) < 4 || parts[0] != "api" || parts[1] != "sessions" || parts[3] != "session-start" {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	sessionID := parts[3]
+	sessionID := parts[2]
 
 	h.mu.Lock()
 	s, ok := h.sessions[sessionID]
@@ -750,11 +762,11 @@ func (h *Handler) HandlePromptSubmitted(w http.ResponseWriter, r *http.Request) 
 	}
 
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 {
+	if len(parts) < 4 {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	sessionID := parts[3]
+	sessionID := parts[2]
 
 	h.mu.Lock()
 	s, ok := h.sessions[sessionID]

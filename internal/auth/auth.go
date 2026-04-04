@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -24,12 +23,6 @@ func GenerateToken() string {
 // so subsequent requests don't need the query parameter.
 func Middleware(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth for /api/noauth/ endpoints (e.g. Claude Code hooks)
-		if strings.HasPrefix(r.URL.Path, "/api/noauth/") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		// Check cookie first
 		if c, err := r.Cookie(cookieName); err == nil && c.Value == token {
 			next.ServeHTTP(w, r)
