@@ -119,6 +119,11 @@ type Handler struct {
 	sessions   map[string]*session
 }
 
+// shellEscape wraps a string in single quotes, escaping any single quotes within.
+func shellEscape(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
 func NewHandler(command string, listenAddr string, store *state.Store, token string) *Handler {
 	return &Handler{
 		command:    command,
@@ -187,7 +192,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	// Create a hook script that includes the auth token
 	hookScriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id))
 	hookScriptContent := fmt.Sprintf("#!/bin/sh\ncurl -s -X POST -H 'Content-Type: application/json' -b 'oriel-token=%s' -d @- \"http://%s/api/sessions/%s/$1\"\n",
-		h.token, h.listenAddr, s.id)
+		shellEscape(h.token), h.listenAddr, shellEscape(s.id))
 	if err := os.WriteFile(hookScriptPath, []byte(hookScriptContent), 0700); err != nil {
 		return fmt.Errorf("write hooks script: %w", err)
 	}
@@ -210,7 +215,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	}
 	scriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id))
 	scriptContent := fmt.Sprintf("#!/bin/sh\nexec %s editor --url http://%s --session %s --token %s \"$@\"\n",
-		selfPath, h.listenAddr, s.id, h.token)
+		shellEscape(selfPath), h.listenAddr, shellEscape(s.id), shellEscape(h.token))
 	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0700); err != nil {
 		return fmt.Errorf("write editor script: %w", err)
 	}
@@ -295,17 +300,25 @@ func (h *Handler) restartLoop(s *session) {
 
 func (h *Handler) readPtyLoop(s *session) {
 	buf := make([]byte, 4096)
+	s.mu.Lock()
+	currentPty := s.pty // capture at start to detect restarts
+	s.mu.Unlock()
 
 	for {
-		n, err := s.pty.Read(buf)
+		n, err := currentPty.Read(buf)
 		if err != nil {
 			h.broadcast(s, message{Type: "exit"})
 			s.mu.Lock()
 			s.exited = true
+			isCurrentPty := s.pty == currentPty
 			s.mu.Unlock()
-			// Clean up temp scripts for this session
-			os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id)))
-			os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id)))
+			// Clean up temp scripts only if we're still the current PTY.
+			// If the session was restarted, a new PTY has already replaced us
+			// and we must not remove the scripts that the new PTY depends on.
+			if isCurrentPty {
+				os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id)))
+				os.Remove(filepath.Join(os.TempDir(), fmt.Sprintf("oriel-editor-%s.sh", s.id)))
+			}
 			return
 		}
 
