@@ -19,15 +19,9 @@ A rich web UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 ### Install
 
-Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page.
+Download a pre-built binary from the [Releases](https://github.com/ryotarai/oriel/releases) page and place it somewhere in your PATH.
 
-Or install with Go:
-
-```bash
-go install github.com/ryotarai/oriel/cmd/oriel@latest
-```
-
-Or build from source:
+To build from source instead:
 
 ```bash
 git clone https://github.com/ryotarai/oriel.git
