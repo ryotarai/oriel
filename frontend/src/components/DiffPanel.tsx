@@ -115,6 +115,15 @@ export function DiffPanel({ files, onSendInput, cwd }: DiffPanelProps) {
                   {f.status}
                 </span>
                 <span className="text-sm font-mono text-gray-200">{f.path}</span>
+                <a
+                  href={`vscode://file${f.path.startsWith("/") ? f.path : `/${cwd || ""}/${f.path}`}`}
+                  className="ml-auto text-gray-500 hover:text-gray-300 px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-600 inline-flex items-center"
+                  title="Open in VS Code"
+                >
+                  <svg width="12" height="12" viewBox="0 0 100 100" fill="currentColor">
+                    <path d="M70.8 6.8L29.3 42.5 12.7 29.8 4.5 33.5v33l8.2 3.7 16.6-12.7L70.8 93.2 95.5 82V18L70.8 6.8zM29.3 61.5l-12.5 9.5V29l12.5 9.5v23zm41.5 14.3L49.5 58.5l21.3-17.3v34.6z"/>
+                  </svg>
+                </a>
               </div>
               {/* Diff content */}
               {f.diff ? (
