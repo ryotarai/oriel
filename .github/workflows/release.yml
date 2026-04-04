@@ -64,32 +64,32 @@ jobs:
           SHA256_LINUX_AMD64=$(download_and_sha256 "oriel-linux-amd64")
           SHA256_LINUX_ARM64=$(download_and_sha256 "oriel-linux-arm64")
 
-          cat > homebrew-tap/Formula/oriel.rb <<'FORMULA_END'
+          cat > homebrew-tap/Formula/oriel.rb <<FORMULA_END
 class Oriel < Formula
   desc "Rich web UI for Claude Code"
   homepage "https://github.com/ryotarai/oriel"
-  version "VERSION_PLACEHOLDER"
+  version "${VERSION}"
   license "MIT"
 
   on_macos do
     on_intel do
-      url "https://github.com/ryotarai/oriel/releases/download/vVERSION_PLACEHOLDER/oriel-darwin-amd64"
-      sha256 "SHA256_DARWIN_AMD64_PLACEHOLDER"
+      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-darwin-amd64"
+      sha256 "${SHA256_DARWIN_AMD64}"
     end
     on_arm do
-      url "https://github.com/ryotarai/oriel/releases/download/vVERSION_PLACEHOLDER/oriel-darwin-arm64"
-      sha256 "SHA256_DARWIN_ARM64_PLACEHOLDER"
+      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-darwin-arm64"
+      sha256 "${SHA256_DARWIN_ARM64}"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/ryotarai/oriel/releases/download/vVERSION_PLACEHOLDER/oriel-linux-amd64"
-      sha256 "SHA256_LINUX_AMD64_PLACEHOLDER"
+      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-linux-amd64"
+      sha256 "${SHA256_LINUX_AMD64}"
     end
     on_arm do
-      url "https://github.com/ryotarai/oriel/releases/download/vVERSION_PLACEHOLDER/oriel-linux-arm64"
-      sha256 "SHA256_LINUX_ARM64_PLACEHOLDER"
+      url "https://github.com/ryotarai/oriel/releases/download/v#{version}/oriel-linux-arm64"
+      sha256 "${SHA256_LINUX_ARM64}"
     end
   end
 
@@ -98,14 +98,6 @@ class Oriel < Formula
   end
 end
 FORMULA_END
-
-          sed -i \
-            -e "s/VERSION_PLACEHOLDER/${VERSION}/g" \
-            -e "s/SHA256_DARWIN_AMD64_PLACEHOLDER/${SHA256_DARWIN_AMD64}/" \
-            -e "s/SHA256_DARWIN_ARM64_PLACEHOLDER/${SHA256_DARWIN_ARM64}/" \
-            -e "s/SHA256_LINUX_AMD64_PLACEHOLDER/${SHA256_LINUX_AMD64}/" \
-            -e "s/SHA256_LINUX_ARM64_PLACEHOLDER/${SHA256_LINUX_ARM64}/" \
-            homebrew-tap/Formula/oriel.rb
 
       - name: Commit and push updated formula
         env:
