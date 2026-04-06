@@ -364,6 +364,7 @@ export default function App() {
                       else paneRefs.current.delete(pane.id);
                     }}
                     onFocus={() => { if (tab.activePaneIndex !== i || appConfig.swapPaneWidthOnFocus) updateActiveTab((t) => { const splits = appConfig.swapPaneWidthOnFocus ? swapPaneSplits(t.splits, t.panes.length, t.activePaneIndex, i) : t.splits; return { ...t, activePaneIndex: i, splits }; }); }}
+                    isActiveTab={isActive}
                   />
                 ))}
               </div>
@@ -424,9 +425,10 @@ interface PaneWithDividerProps {
   onFocus: () => void;
   resumeSessionId?: string;
   onClaudeSessionId?: (uuid: string) => void;
+  isActiveTab?: boolean;
 }
 
-function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, isFocused, swapEnterKeys, onCwdChange, onRef, onFocus, resumeSessionId, onClaudeSessionId }: PaneWithDividerProps) {
+function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDividerDrag, isFocused, swapEnterKeys, onCwdChange, onRef, onFocus, resumeSessionId, onClaudeSessionId, isActiveTab }: PaneWithDividerProps) {
   const sessionRef = useRef<SessionPanelHandle>(null);
   const paneContainerRef = useRef<HTMLDivElement>(null);
   const {
@@ -519,6 +521,7 @@ function PaneWithDivider({ pane, width, isLast, showClose, onClose, onAdd, onDiv
           onCwdChange={onCwdChange}
           resumeSessionId={resumeSessionId}
           onClaudeSessionId={onClaudeSessionId}
+          isActiveTab={isActiveTab}
         />
       </div>
       {!isLast && (
