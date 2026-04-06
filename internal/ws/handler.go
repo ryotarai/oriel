@@ -487,6 +487,9 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 			if entry.Type == "tool_result" || (entry.Type == "assistant" && !entry.IsThinking && entry.ToolName == "") {
 				s.mu.Lock()
 				ch := s.permissionDoneCh
+				if ch != nil {
+					s.permissionDoneCh = nil
+				}
 				s.mu.Unlock()
 				if ch != nil {
 					ch <- permissionResult{
@@ -1261,14 +1264,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.editorDoneCh = nil
 		}
 		// Cancel pending permission request if this was the last subscriber
+		var permCh chan permissionResult
 		if len(s.subs) == 0 && s.permissionDoneCh != nil {
-			s.permissionDoneCh <- permissionResult{
-				HookEventName: "PermissionRequest",
-				Decision:      permissionDecision{Behavior: "deny", Message: "All clients disconnected"},
-			}
+			permCh = s.permissionDoneCh
 			s.permissionDoneCh = nil
 		}
 		s.mu.Unlock()
+		if permCh != nil {
+			permCh <- permissionResult{
+				HookEventName: "PermissionRequest",
+				Decision:      permissionDecision{Behavior: "deny", Message: "All clients disconnected"},
+			}
+		}
 		close(sub.doneCh)
 	}()
 
@@ -1377,6 +1384,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case "permission_response":
 			s.mu.Lock()
 			ch := s.permissionDoneCh
+			if ch != nil {
+				s.permissionDoneCh = nil
+			}
 			s.mu.Unlock()
 			if ch != nil {
 				var result permissionResult
