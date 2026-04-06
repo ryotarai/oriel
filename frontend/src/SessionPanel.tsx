@@ -273,6 +273,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setSuggestions([]);
           setSuggestionsLoading(false);
           setWorktreeDir("");
+          setPermissionRequest(null);
+          setSelectedSuggestions(new Set());
         } else if (msg.type === "worktree_changed") {
           setWorktreeDir(msg.data || "");
         } else if (msg.type === "cwd" && msg.data) {
@@ -943,63 +945,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               {renderedEntries}
               {/* Active tool indicator: show even when tools are hidden */}
               {activeToolEntry && <ActiveToolIndicator entry={activeToolEntry} />}
-              {permissionRequest && (
-                <PermissionRequestBanner
-                  request={permissionRequest}
-                  selectedSuggestions={selectedSuggestions}
-                  onToggleSuggestion={(index) => {
-                    setSelectedSuggestions(prev => {
-                      const next = new Set(prev);
-                      if (next.has(index)) next.delete(index); else next.add(index);
-                      return next;
-                    });
-                  }}
-                  onAllow={() => {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({
-                        type: "permission_response",
-                        data: JSON.stringify({
-                          hookEventName: "PermissionRequest",
-                          decision: { behavior: "allow" },
-                        }),
-                      }));
-                    }
-                    setPermissionRequest(null);
-                    setSelectedSuggestions(new Set());
-                  }}
-                  onAllowWithSuggestions={() => {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      const suggestions = permissionRequest.permissionSuggestions
-                        .filter((_, i) => selectedSuggestions.has(i));
-                      ws.send(JSON.stringify({
-                        type: "permission_response",
-                        data: JSON.stringify({
-                          hookEventName: "PermissionRequest",
-                          decision: { behavior: "allow", updatedPermissions: suggestions },
-                        }),
-                      }));
-                    }
-                    setPermissionRequest(null);
-                    setSelectedSuggestions(new Set());
-                  }}
-                  onDeny={() => {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({
-                        type: "permission_response",
-                        data: JSON.stringify({
-                          hookEventName: "PermissionRequest",
-                          decision: { behavior: "deny", message: "Denied by user" },
-                        }),
-                      }));
-                    }
-                    setPermissionRequest(null);
-                    setSelectedSuggestions(new Set());
-                  }}
-                />
-              )}
               <div ref={chatEndRef} />
               {/* Reply suggestions */}
               <SuggestionsBar
@@ -1029,6 +974,65 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               </button>
             )}
           </div>
+          {permissionRequest && (
+            <div className="absolute bottom-0 left-0 right-0 z-20 p-2">
+              <PermissionRequestBanner
+                request={permissionRequest}
+                selectedSuggestions={selectedSuggestions}
+                onToggleSuggestion={(index) => {
+                  setSelectedSuggestions(prev => {
+                    const next = new Set(prev);
+                    if (next.has(index)) next.delete(index); else next.add(index);
+                    return next;
+                  });
+                }}
+                onAllow={() => {
+                  const ws = wsRef.current;
+                  if (ws?.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                      type: "permission_response",
+                      data: JSON.stringify({
+                        hookEventName: "PermissionRequest",
+                        decision: { behavior: "allow" },
+                      }),
+                    }));
+                    setPermissionRequest(null);
+                    setSelectedSuggestions(new Set());
+                  }
+                }}
+                onAllowWithSuggestions={() => {
+                  const ws = wsRef.current;
+                  if (ws?.readyState === WebSocket.OPEN) {
+                    const suggestions = permissionRequest.permissionSuggestions
+                      .filter((_, i) => selectedSuggestions.has(i));
+                    ws.send(JSON.stringify({
+                      type: "permission_response",
+                      data: JSON.stringify({
+                        hookEventName: "PermissionRequest",
+                        decision: { behavior: "allow", updatedPermissions: suggestions },
+                      }),
+                    }));
+                    setPermissionRequest(null);
+                    setSelectedSuggestions(new Set());
+                  }
+                }}
+                onDeny={() => {
+                  const ws = wsRef.current;
+                  if (ws?.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                      type: "permission_response",
+                      data: JSON.stringify({
+                        hookEventName: "PermissionRequest",
+                        decision: { behavior: "deny", message: "Denied by user" },
+                      }),
+                    }));
+                    setPermissionRequest(null);
+                    setSelectedSuggestions(new Set());
+                  }
+                }}
+              />
+            </div>
+          )}
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "diff" ? "hidden" : ""}`}>
             <DiffPanel files={diffFiles} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} />
