@@ -119,6 +119,12 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [editorInitialValue, setEditorInitialValue] = useState(""); // initial value for editor_open
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [permissionRequest, setPermissionRequest] = useState<{
+    toolName: string;
+    toolInput: Record<string, unknown>;
+    permissionSuggestions: unknown[];
+  } | null>(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<number>>(new Set());
 
   const effectiveDir = worktreeDir || cwd || "";
 
@@ -317,6 +323,24 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setEditorMode(true);
           setEditorInitialValue(msg.data || "");
           setTextareaMode(true);
+        } else if (msg.type === "permission_request") {
+          try {
+            const data = JSON.parse(msg.data);
+            setPermissionRequest({
+              toolName: data.toolName ?? "",
+              toolInput: data.toolInput ?? {},
+              permissionSuggestions: data.permissionSuggestions ?? [],
+            });
+            setSelectedSuggestions(new Set());
+            // Switch to conversation tab and scroll to bottom
+            setActiveTab("conversation");
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+          } catch (e) {
+            console.warn("Failed to parse permission_request:", e);
+          }
+        } else if (msg.type === "permission_request_resolved") {
+          setPermissionRequest(null);
+          setSelectedSuggestions(new Set());
         }
       };
 
@@ -919,6 +943,63 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               {renderedEntries}
               {/* Active tool indicator: show even when tools are hidden */}
               {activeToolEntry && <ActiveToolIndicator entry={activeToolEntry} />}
+              {permissionRequest && (
+                <PermissionRequestBanner
+                  request={permissionRequest}
+                  selectedSuggestions={selectedSuggestions}
+                  onToggleSuggestion={(index) => {
+                    setSelectedSuggestions(prev => {
+                      const next = new Set(prev);
+                      if (next.has(index)) next.delete(index); else next.add(index);
+                      return next;
+                    });
+                  }}
+                  onAllow={() => {
+                    const ws = wsRef.current;
+                    if (ws?.readyState === WebSocket.OPEN) {
+                      ws.send(JSON.stringify({
+                        type: "permission_response",
+                        data: JSON.stringify({
+                          hookEventName: "PermissionRequest",
+                          decision: { behavior: "allow" },
+                        }),
+                      }));
+                    }
+                    setPermissionRequest(null);
+                    setSelectedSuggestions(new Set());
+                  }}
+                  onAllowWithSuggestions={() => {
+                    const ws = wsRef.current;
+                    if (ws?.readyState === WebSocket.OPEN) {
+                      const suggestions = permissionRequest.permissionSuggestions
+                        .filter((_, i) => selectedSuggestions.has(i));
+                      ws.send(JSON.stringify({
+                        type: "permission_response",
+                        data: JSON.stringify({
+                          hookEventName: "PermissionRequest",
+                          decision: { behavior: "allow", updatedPermissions: suggestions },
+                        }),
+                      }));
+                    }
+                    setPermissionRequest(null);
+                    setSelectedSuggestions(new Set());
+                  }}
+                  onDeny={() => {
+                    const ws = wsRef.current;
+                    if (ws?.readyState === WebSocket.OPEN) {
+                      ws.send(JSON.stringify({
+                        type: "permission_response",
+                        data: JSON.stringify({
+                          hookEventName: "PermissionRequest",
+                          decision: { behavior: "deny", message: "Denied by user" },
+                        }),
+                      }));
+                    }
+                    setPermissionRequest(null);
+                    setSelectedSuggestions(new Set());
+                  }}
+                />
+              )}
               <div ref={chatEndRef} />
               {/* Reply suggestions */}
               <SuggestionsBar
@@ -1862,3 +1943,112 @@ const SuggestionsBar = React.memo(function SuggestionsBar({
     </>
   );
 });
+
+function PermissionRequestBanner({
+  request,
+  selectedSuggestions,
+  onToggleSuggestion,
+  onAllow,
+  onAllowWithSuggestions,
+  onDeny,
+}: {
+  request: { toolName: string; toolInput: Record<string, unknown>; permissionSuggestions: unknown[] };
+  selectedSuggestions: Set<number>;
+  onToggleSuggestion: (index: number) => void;
+  onAllow: () => void;
+  onAllowWithSuggestions: () => void;
+  onDeny: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const inputJson = JSON.stringify(request.toolInput);
+  const summary = toolUseSummary(request.toolName, inputJson);
+  const isEdit = request.toolName === "Edit";
+  const isWrite = request.toolName === "Write";
+  const parsedInput = request.toolInput;
+
+  return (
+    <div className="mx-2 mb-2 rounded-lg border border-yellow-600/50 bg-yellow-950/20">
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-yellow-600/30">
+        <div className="flex items-center gap-2 text-xs text-yellow-400 font-medium mb-1">
+          <span>⚠</span>
+          <span>Permission Request</span>
+        </div>
+        {/* Tool info row (reuse ToolUseBlock style) */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full text-left rounded-lg bg-gray-800/60 border border-gray-700/50 px-3 py-1.5 hover:bg-gray-800 transition-colors"
+        >
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-500">{expanded ? "▼" : "▶"}</span>
+            <span className="text-green-400 font-medium">{request.toolName}</span>
+            <span className="text-gray-400 truncate">{summary}</span>
+          </div>
+        </button>
+        {/* Expanded tool input details */}
+        {expanded && isWrite && parsedInput?.content != null && (
+          <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 overflow-hidden">
+            <pre className="px-3 py-2 text-xs font-mono text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">
+              {String(parsedInput.content)}
+            </pre>
+          </div>
+        )}
+        {expanded && isEdit && parsedInput && (
+          <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 overflow-hidden">
+            <EditDiff
+              oldStr={String(parsedInput.old_string ?? "")}
+              newStr={String(parsedInput.new_string ?? "")}
+            />
+          </div>
+        )}
+        {expanded && !isWrite && !isEdit && (
+          <div className="mt-1 rounded-lg bg-gray-900 border border-gray-700/50 px-3 py-2 text-xs font-mono text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-60 overflow-y-auto">
+            {formatToolInput(inputJson)}
+          </div>
+        )}
+      </div>
+      {/* Permission suggestions */}
+      {request.permissionSuggestions.length > 0 && (
+        <div className="px-3 py-2 border-b border-yellow-600/30">
+          <div className="text-xs text-gray-400 mb-2">Remember this decision:</div>
+          {request.permissionSuggestions.map((suggestion, index) => (
+            <label key={index} className="flex items-start gap-2 text-xs text-gray-300 mb-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedSuggestions.has(index)}
+                onChange={() => onToggleSuggestion(index)}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="font-mono text-[10px] text-gray-400 whitespace-pre-wrap">
+                {JSON.stringify(suggestion, null, 2)}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+      {/* Action buttons */}
+      <div className="px-3 py-2 flex gap-2">
+        <button
+          onClick={onAllow}
+          className="px-3 py-1 text-xs rounded bg-green-800/60 border border-green-600/50 text-green-300 hover:bg-green-700/60 transition-colors"
+        >
+          Allow
+        </button>
+        {selectedSuggestions.size > 0 && (
+          <button
+            onClick={onAllowWithSuggestions}
+            className="px-3 py-1 text-xs rounded bg-green-800/60 border border-green-600/50 text-green-300 hover:bg-green-700/60 transition-colors"
+          >
+            Allow &amp; Remember
+          </button>
+        )}
+        <button
+          onClick={onDeny}
+          className="px-3 py-1 text-xs rounded bg-red-900/60 border border-red-700/50 text-red-300 hover:bg-red-800/60 transition-colors"
+        >
+          Deny
+        </button>
+      </div>
+    </div>
+  );
+}
