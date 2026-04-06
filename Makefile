@@ -1,4 +1,4 @@
-.PHONY: dev build build-all test clean
+.PHONY: dev build build-all test clean npm-install-linux
 
 build: frontend-build
 	go build -o bin/oriel ./cmd/oriel/
@@ -40,3 +40,6 @@ clean:
 	rm -rf frontend/dist
 	rm -rf frontend/node_modules
 	rm -rf tests/e2e/node_modules
+
+npm-install-linux:
+	docker run --rm -v "$(CURDIR)/frontend":/app -w /app node:24 npm install
