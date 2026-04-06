@@ -1,4 +1,4 @@
-import { useRef, useEffect, useLayoutEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -1107,7 +1107,7 @@ function parseBashTags(text: string): BashParts | null {
   };
 }
 
-function BashBlock({ parts }: { parts: BashParts }) {
+const BashBlock = React.memo(function BashBlock({ parts }: { parts: BashParts }) {
   return (
     <div className="rounded-lg bg-gray-900 border border-gray-700 overflow-hidden text-xs font-mono">
       {parts.input != null && (
@@ -1124,7 +1124,7 @@ function BashBlock({ parts }: { parts: BashParts }) {
       )}
     </div>
   );
-}
+});
 
 function formatTimestamp(ts: string): string {
   const date = new Date(ts);
@@ -1150,7 +1150,77 @@ function shouldShowTimestamp(prev: string | undefined, curr: string | undefined)
 
 const AGENT_COLLAPSE_THRESHOLD = 200;
 
-function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (path: string) => void }) {
+// Module-level stable references to avoid creating new arrays/objects on every render
+const remarkPlugins = [remarkGfm];
+const rehypePlugins = [rehypeHighlight];
+
+const MarkdownContent = React.memo(function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (path: string) => void }) {
+  const components = useMemo(() => ({
+    a: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { children?: React.ReactNode }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseDown={(e) => e.preventDefault()}
+        {...props}
+      >
+        {children}
+      </a>
+    ),
+    pre: ({ children, ...props }: React.HTMLAttributes<HTMLPreElement> & { children?: React.ReactNode }) => {
+      const extractText = (node: React.ReactNode): string => {
+        if (typeof node === "string") return node;
+        if (Array.isArray(node)) return node.map(extractText).join("");
+        if (node && typeof node === "object" && "props" in node) {
+          return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+        }
+        return "";
+      };
+      const codeText = extractText(children);
+      return (
+        <div className="relative group/code">
+          <button
+            onClick={() => navigator.clipboard.writeText(codeText)}
+            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
+            title="Copy code"
+          >
+            Copy
+          </button>
+          <pre {...props}>{children}</pre>
+        </div>
+      );
+    },
+    table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement> & { children?: React.ReactNode }) => (
+      <div className="overflow-x-auto max-w-full">
+        <table {...props}>{children}</table>
+      </div>
+    ),
+    code: ({ children, className, ...props }: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode }) => {
+      if (className?.includes("language-mermaid")) {
+        const chart = typeof children === "string" ? children : String(children ?? "");
+        return <MermaidBlock chart={chart.trim()} />;
+      }
+      if (className) {
+        return <code className={className} {...props}>{children}</code>;
+      }
+      const codeText = typeof children === "string" ? children : String(children ?? "");
+      if (onOpenFile && isFilePath(codeText)) {
+        const cleanPath = codeText.replace(/:\d+(-\d+)?$/, "");
+        return (
+          <code
+            className="cursor-pointer hover:underline hover:text-blue-300"
+            onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+            title="Open in File Explorer"
+            {...props}
+          >
+            {children}
+          </code>
+        );
+      }
+      return <code {...props}>{children}</code>;
+    },
+  }), [onOpenFile]);
+
   return (
     <div className="prose prose-invert prose-sm max-w-none
       prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
@@ -1162,80 +1232,17 @@ function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (pat
       prose-strong:text-gray-100
     ">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              {children}
-            </a>
-          ),
-          pre: ({ children, ...props }) => {
-            const extractText = (node: React.ReactNode): string => {
-              if (typeof node === "string") return node;
-              if (Array.isArray(node)) return node.map(extractText).join("");
-              if (node && typeof node === "object" && "props" in node) {
-                return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
-              }
-              return "";
-            };
-            const text = extractText(children);
-            return (
-              <div className="relative group/code">
-                <button
-                  onClick={() => navigator.clipboard.writeText(text)}
-                  className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
-                  title="Copy code"
-                >
-                  Copy
-                </button>
-                <pre {...props}>{children}</pre>
-              </div>
-            );
-          },
-          table: ({ children, ...props }) => (
-            <div className="overflow-x-auto max-w-full">
-              <table {...props}>{children}</table>
-            </div>
-          ),
-          code: ({ children, className, ...props }) => {
-            if (className?.includes("language-mermaid")) {
-              const chart = typeof children === "string" ? children : String(children ?? "");
-              return <MermaidBlock chart={chart.trim()} />;
-            }
-            if (className) {
-              return <code className={className} {...props}>{children}</code>;
-            }
-            const codeText = typeof children === "string" ? children : String(children ?? "");
-            if (onOpenFile && isFilePath(codeText)) {
-              const cleanPath = codeText.replace(/:\d+(-\d+)?$/, "");
-              return (
-                <code
-                  className="cursor-pointer hover:underline hover:text-blue-300"
-                  onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
-                  title="Open in File Explorer"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-            return <code {...props}>{children}</code>;
-          },
-        }}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
       >
         {text}
       </ReactMarkdown>
     </div>
   );
-}
+});
 
-function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
+const MessageBubble = React.memo(function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") {
     return <ExitPlanModeBlock entry={entry} />;
   }
@@ -1331,9 +1338,9 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
       <MarkdownContent text={entry.text} onOpenFile={onOpenFile} />
     </div>
   );
-}
+});
 
-function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
+const AgentResultBlock = React.memo(function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
   const [expanded, setExpanded] = useState(false);
@@ -1386,9 +1393,9 @@ function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onO
       </div>
     </div>
   );
-}
+});
 
-function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
+const ExitPlanModeBlock = React.memo(function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
   let parsedInput: Record<string, unknown> | null = null;
   try {
     parsedInput = JSON.parse(entry.toolInput ?? "{}");
@@ -1408,9 +1415,9 @@ function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
       </div>
     </div>
   );
-}
+});
 
-function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
+const ToolUseBlock = React.memo(function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const summary = toolUseSummary(entry.toolName ?? "", entry.toolInput ?? "");
 
@@ -1456,9 +1463,9 @@ function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
       )}
     </div>
   );
-}
+});
 
-function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
+const ActiveToolIndicator = React.memo(function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
   const summary = toolUseSummary(entry.toolName ?? "", entry.toolInput ?? "");
   return (
     <div className="my-1">
@@ -1474,9 +1481,9 @@ function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
       </div>
     </div>
   );
-}
+});
 
-function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
+const EditDiff = React.memo(function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
   const oldLines = oldStr.split("\n");
   const newLines = newStr.split("\n");
 
@@ -1494,9 +1501,9 @@ function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
       ))}
     </pre>
   );
-}
+});
 
-function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
+const ToolResultBlock = React.memo(function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const text = entry.text || "";
   const lines = text.split("\n");
@@ -1540,9 +1547,9 @@ function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
       )}
     </div>
   );
-}
+});
 
-function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boolean }) {
+const TaskOverlay = React.memo(function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -1616,7 +1623,7 @@ function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boo
       )}
     </div>
   );
-}
+});
 
 function toolUseSummary(name: string, inputJson: string): string {
   try {
