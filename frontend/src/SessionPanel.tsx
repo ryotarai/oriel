@@ -666,6 +666,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   // Counter to trigger FileExplorer and CommitsPanel refresh on file changes
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Memoize the array of changed paths to avoid passing a new array reference on every render
+  const changedPaths = useMemo(() => diffFiles.map(f => f.path), [diffFiles]);
+
   useEffect(() => {
     fetchDiffData();
   }, [fetchDiffData]);
@@ -935,7 +938,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             <CommitsPanel cwd={effectiveDir || undefined} refreshTrigger={refreshTrigger} />
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "files" ? "hidden" : ""}`}>
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} refreshTrigger={refreshTrigger} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={changedPaths} refreshTrigger={refreshTrigger} />
           </div>
       </div>
 
