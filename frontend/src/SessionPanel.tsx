@@ -113,6 +113,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [textareaValue, setTextareaValue] = useState("");
   const [editorMode, setEditorMode] = useState(false); // true when opened via $EDITOR
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const effectiveDir = worktreeDir || cwd || "";
@@ -128,8 +129,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   const showToast = useCallback((msg: string) => {
+    if (toastTimerRef.current !== null) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 3000);
   }, []);
 
   const handleImagePaste = useCallback(
@@ -178,8 +185,14 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         showToast("Failed to save image");
       }
     },
-    [sendInputToTerminal, showToast]
+    [sendInputToTerminal, showToast, textareaRef]
   );
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   // Focus textarea when entering textarea mode
   useEffect(() => {
