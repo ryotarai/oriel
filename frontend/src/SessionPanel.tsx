@@ -1,4 +1,4 @@
-import { useRef, useEffect, useLayoutEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -98,7 +98,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState(false);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  // tasks is derived from entries; computed with useMemo to avoid double-render
+
   const [worktreeDir, setWorktreeDir] = useState("");
   const [running, setRunning] = useState(false);
   const [suggestions, setSuggestions] = useState<{ label: string; message: string }[]>([]);
@@ -110,9 +111,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [textareaMode, setTextareaMode] = useState(false);
-  const [textareaValue, setTextareaValue] = useState("");
   const [editorMode, setEditorMode] = useState(false); // true when opened via $EDITOR
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editorInitialValue, setEditorInitialValue] = useState(""); // initial value for editor_open
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -140,7 +140,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   const handleImagePaste = useCallback(
-    async (e: ClipboardEvent | React.ClipboardEvent, mode: "terminal" | "textarea") => {
+    async (e: ClipboardEvent | React.ClipboardEvent, mode: "terminal") => {
       const files = e.clipboardData?.files;
       if (!files || files.length === 0) return;
 
@@ -157,41 +157,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         sendInputToTerminal("\x1b[200~\x1b[201~");
         return;
       }
-
-      // textarea mode: save image to disk and insert the file path at cursor.
-      const MAX = 10 * 1024 * 1024;
-      if (imageFile.size > MAX) {
-        showToast("Image exceeds 10 MB limit");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("image", imageFile);
-
-      try {
-        const res = await fetch("/api/images/save", { method: "POST", body: formData, credentials: "include" });
-        if (!res.ok) {
-          const text = await res.text();
-          showToast(`Failed to save image: ${text}`);
-          return;
-        }
-        const { path } = await res.json() as { path: string };
-
-        const ta = textareaRef.current;
-        if (!ta) return;
-        const start = ta.selectionStart ?? ta.value.length;
-        const end = ta.selectionEnd ?? ta.value.length;
-        const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
-        setTextareaValue(newValue);
-        requestAnimationFrame(() => {
-          ta.selectionStart = start + path.length;
-          ta.selectionEnd = start + path.length;
-        });
-      } catch {
-        showToast("Failed to save image");
-      }
     },
-    [sendInputToTerminal, showToast, textareaRef]
+    [sendInputToTerminal]
   );
 
   // Keep a ref to the latest handleImagePaste so it can be used in the xterm init effect
@@ -204,13 +171,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
     };
   }, []);
-
-  // Focus textarea when entering textarea mode
-  useEffect(() => {
-    if (textareaMode) {
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    }
-  }, [textareaMode]);
 
   const openFileInExplorer = useCallback((path: string) => {
     setFileToOpen(path);
@@ -332,8 +292,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setRefreshTrigger(c => c + 1);
         } else if (msg.type === "editor_open") {
           setEditorMode(true);
+          setEditorInitialValue(msg.data || "");
           setTextareaMode(true);
-          setTextareaValue(msg.data || "");
         }
       };
 
@@ -487,8 +447,19 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     return () => observer.disconnect();
   }, []);
 
-  // Extract task state from conversation entries
-  useEffect(() => {
+  // Build a Map from toolUseId → entry for O(1) lookup (avoids O(n²) entries.find() in filter)
+  const toolUseEntryMap = useMemo(() => {
+    const map = new Map<string, ConversationEntry>();
+    for (const e of entries) {
+      if (e.type === "tool_use" && e.toolUseId) {
+        map.set(e.toolUseId, e);
+      }
+    }
+    return map;
+  }, [entries]);
+
+  // Extract task state from conversation entries (useMemo avoids double-render vs useEffect+setState)
+  const tasks = useMemo(() => {
     const taskMap = new Map<string, TaskItem>();
 
     // Pass 1: process TaskCreate tool_use entries, keyed by toolUseId
@@ -507,9 +478,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     // Pass 2: resolve numeric taskIds from tool_result entries so TaskUpdate can match
     for (const entry of entries) {
       if (entry.type !== "tool_result" || !entry.toolUseId) continue;
-      const matchingUse = entries.find(
-        (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId && e.toolName === "TaskCreate"
-      );
+      const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+      if (matchingUse?.toolName !== "TaskCreate") continue;
       if (matchingUse && entry.text) {
         const idMatch = entry.text.match(/Task #(\d+)/i) || entry.text.match(/#(\d+)/);
         if (idMatch) {
@@ -539,8 +509,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       } catch {}
     }
 
-    setTasks(Array.from(taskMap.values()));
-  }, [entries]);
+    return Array.from(taskMap.values());
+  }, [entries, toolUseEntryMap]);
 
 
 
@@ -655,6 +625,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   // Counter to trigger FileExplorer and CommitsPanel refresh on file changes
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Memoize the array of changed paths to avoid passing a new array reference on every render
+  const changedPaths = useMemo(() => diffFiles.map(f => f.path), [diffFiles]);
+
   useEffect(() => {
     fetchDiffData();
   }, [fetchDiffData]);
@@ -680,6 +653,114 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     document.addEventListener("mouseup", onUp);
   }, []);
 
+  // TextareaOverlay callbacks
+  const handleTextareaSend = useCallback((value: string) => {
+    sendInputToTerminal(value);
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, [sendInputToTerminal]);
+
+  const handleTextareaCancel = useCallback(() => {
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, []);
+
+  const handleEditorDone = useCallback((value: string) => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      const bytes = new TextEncoder().encode(value);
+      const base64 = btoa(String.fromCharCode(...bytes));
+      ws.send(JSON.stringify({ type: "editor_done", data: base64 }));
+    }
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, []);
+
+  const handleEditorCancel = useCallback(() => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "editor_cancel" }));
+    }
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, []);
+
+  // SuggestionsBar callback
+  const handleSuggestionClick = useCallback((message: string) => {
+    sendInputToTerminal(message + "\r");
+    setSuggestions([]);
+  }, [sendInputToTerminal]);
+
+  // Memoize the filtered conversation entries to avoid recomputing on every render
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry) => {
+      // Always show ExitPlanMode tool_use (rendered as markdown plan)
+      if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") return true;
+      if (!showTools && entry.type === "tool_use") return false;
+      if (!showTools && entry.type === "tool_result") {
+        // Show Agent tool results even when tools are hidden
+        const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+        if (!matchingUse || matchingUse.toolName !== "Agent") return false;
+      }
+      // Hide TaskCreate/TaskUpdate tool blocks (shown as overlay instead)
+      if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
+        return false;
+      }
+      // Hide tool results for TaskCreate, TaskUpdate
+      if (entry.type === "tool_result") {
+        const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+        if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate" || matchingUse.toolName === "ExitPlanMode")) {
+          return false;
+        }
+        // Hide successful Edit/Write results but show errors
+        if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write") && !entry.isError) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [entries, showTools, toolUseEntryMap]);
+
+  // Memoize the rendered conversation list to avoid re-rendering when unrelated state changes
+  const renderedEntries = useMemo(() => {
+    return filteredEntries.map((entry, idx, arr) => {
+      // Render Agent tool results as assistant messages (markdown)
+      const isAgentResult = entry.type === "tool_result" && (() => {
+        const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+        return matchingUse?.toolName === "Agent";
+      })();
+      const isCurrentSearchMatch = searchQuery && searchMatches[currentMatchIdx]?.uuid === entry.uuid;
+      const isAnySearchMatch = searchQuery && entry.text?.toLowerCase().includes(searchQuery.toLowerCase());
+      const prevTimestamp = idx > 0 ? arr[idx - 1].timestamp : undefined;
+      const showTs = shouldShowTimestamp(prevTimestamp, entry.timestamp);
+      return (
+        <div key={entry.uuid}>
+          {showTs && entry.timestamp && (
+            <div className="text-center text-[10px] text-gray-600 py-1">
+              {formatTimestamp(entry.timestamp)}
+            </div>
+          )}
+          <div
+            id={`msg-${entry.uuid}`}
+            className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
+          >
+            {isAgentResult ? (
+              <AgentResultBlock entry={entry} onOpenFile={openFileInExplorer} />
+            ) : (
+              <MessageBubble
+                entry={entry}
+                onOpenFile={openFileInExplorer}
+              />
+            )}
+          </div>
+        </div>
+      );
+    });
+  }, [filteredEntries, searchQuery, searchMatches, currentMatchIdx, openFileInExplorer, toolUseEntryMap]);
 
   return (
     <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border-2 ${isFocused ? "border-blue-500/50" : "border-transparent transition-colors duration-500"}`}>
@@ -798,100 +879,17 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   Messages will appear here...
                 </div>
               )}
-              {entries.filter((entry) => {
-                // Always show ExitPlanMode tool_use (rendered as markdown plan)
-                if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") return true;
-                if (!showTools && entry.type === "tool_use") return false;
-                if (!showTools && entry.type === "tool_result") {
-                  // Show Agent tool results even when tools are hidden
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
-                  );
-                  if (!matchingUse || matchingUse.toolName !== "Agent") return false;
-                }
-                // Hide TaskCreate/TaskUpdate tool blocks (shown as overlay instead)
-                if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
-                  return false;
-                }
-                // Hide tool results for TaskCreate, TaskUpdate
-                if (entry.type === "tool_result") {
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
-                  );
-                  if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate" || matchingUse.toolName === "ExitPlanMode")) {
-                    return false;
-                  }
-                  // Hide successful Edit/Write results but show errors
-                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write") && !entry.isError) {
-                    return false;
-                  }
-                }
-                return true;
-              }).map((entry, idx, arr) => {
-                // Render Agent tool results as assistant messages (markdown)
-                const isAgentResult = entry.type === "tool_result" && (() => {
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
-                  );
-                  return matchingUse?.toolName === "Agent";
-                })();
-                const isCurrentSearchMatch = searchQuery && searchMatches[currentMatchIdx]?.uuid === entry.uuid;
-                const isAnySearchMatch = searchQuery && entry.text?.toLowerCase().includes(searchQuery.toLowerCase());
-                const prevTimestamp = idx > 0 ? arr[idx - 1].timestamp : undefined;
-                const showTs = shouldShowTimestamp(prevTimestamp, entry.timestamp);
-                return (
-                  <div key={entry.uuid}>
-                    {showTs && entry.timestamp && (
-                      <div className="text-center text-[10px] text-gray-600 py-1">
-                        {formatTimestamp(entry.timestamp)}
-                      </div>
-                    )}
-                    <div
-                      id={`msg-${entry.uuid}`}
-                      className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
-                    >
-                      {isAgentResult ? (
-                        <AgentResultBlock entry={entry} onOpenFile={openFileInExplorer} />
-                      ) : (
-                        <MessageBubble
-                          entry={entry}
-                          onOpenFile={openFileInExplorer}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {renderedEntries}
               {/* Active tool indicator: show even when tools are hidden */}
               {activeToolEntry && <ActiveToolIndicator entry={activeToolEntry} />}
               <div ref={chatEndRef} />
               {/* Reply suggestions */}
-              {suggestionsLoading && (
-                <div className="flex items-center gap-2 px-2 py-1.5">
-                  <svg className="animate-spin h-3.5 w-3.5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span className="text-xs text-gray-400">Suggesting replies...</span>
-                </div>
-              )}
-              {suggestions.length > 0 && !running && (
-                <div className="flex gap-2 flex-wrap px-1 pb-1">
-                  {suggestions.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        sendInputToTerminal(s.message + "\r");
-                        setSuggestions([]);
-                      }}
-                      className="text-xs px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/50 transition-colors cursor-pointer"
-                      title={s.message}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <SuggestionsBar
+                suggestions={suggestions}
+                suggestionsLoading={suggestionsLoading}
+                running={running}
+                onSuggestionClick={handleSuggestionClick}
+              />
             </div>
             {showNewMessages && (
               <button
@@ -921,7 +919,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
             <CommitsPanel cwd={effectiveDir || undefined} refreshTrigger={refreshTrigger} />
           </div>
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== "files" ? "hidden" : ""}`}>
-            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={diffFiles.map(f => f.path)} refreshTrigger={refreshTrigger} />
+            <FileExplorer requestedPath={fileToOpen} onSendInput={sendInputToTerminal} cwd={effectiveDir || undefined} changedPaths={changedPaths} refreshTrigger={refreshTrigger} />
           </div>
       </div>
 
@@ -937,57 +935,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           ref={containerRef}
           className={`h-full ${textareaMode ? "invisible" : ""}`}
         />
-        {textareaMode && (
-          <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
-            <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-400 border-b border-gray-700 shrink-0">
-              <span>Textarea Mode — <kbd className="bg-gray-700 px-1 rounded">⌘Enter</kbd> to send, <kbd className="bg-gray-700 px-1 rounded">Esc</kbd> to cancel</span>
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={textareaValue}
-              onChange={(e) => setTextareaValue(e.target.value)}
-              onPaste={(e) => handleImagePaste(e, "textarea")}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  if (editorMode) {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      const bytes = new TextEncoder().encode(textareaValue);
-                      const base64 = btoa(String.fromCharCode(...bytes));
-                      ws.send(JSON.stringify({ type: "editor_done", data: base64 }));
-                    }
-                  } else if (textareaValue) {
-                    sendInputToTerminal(textareaValue);
-                  }
-                  setEditorMode(false);
-                  setTextareaMode(false);
-                  setTextareaValue("");
-                  setTimeout(() => termRef.current?.focus(), 0);
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  if (editorMode) {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({ type: "editor_cancel" }));
-                    }
-                  }
-                  setEditorMode(false);
-                  setTextareaMode(false);
-                  setTextareaValue("");
-                  setTimeout(() => termRef.current?.focus(), 0);
-                }
-              }}
-              className="flex-1 w-full p-2 text-sm text-gray-200 resize-none outline-none"
-              style={{
-                background: "#0a0a0f",
-                fontFamily: "Menlo, Monaco, 'Courier New', monospace",
-                fontSize: 12,
-              }}
-              spellCheck={false}
-            />
-          </div>
-        )}
+        <TextareaOverlay
+          textareaMode={textareaMode}
+          editorMode={editorMode}
+          initialValue={editorInitialValue}
+          onSend={handleTextareaSend}
+          onCancel={handleTextareaCancel}
+          onEditorDone={handleEditorDone}
+          onEditorCancel={handleEditorCancel}
+          onShowToast={showToast}
+        />
       </div>
 
       {/* CWD picker modal */}
@@ -1107,7 +1064,7 @@ function parseBashTags(text: string): BashParts | null {
   };
 }
 
-function BashBlock({ parts }: { parts: BashParts }) {
+const BashBlock = React.memo(function BashBlock({ parts }: { parts: BashParts }) {
   return (
     <div className="rounded-lg bg-gray-900 border border-gray-700 overflow-hidden text-xs font-mono">
       {parts.input != null && (
@@ -1124,7 +1081,7 @@ function BashBlock({ parts }: { parts: BashParts }) {
       )}
     </div>
   );
-}
+});
 
 function formatTimestamp(ts: string): string {
   const date = new Date(ts);
@@ -1150,7 +1107,77 @@ function shouldShowTimestamp(prev: string | undefined, curr: string | undefined)
 
 const AGENT_COLLAPSE_THRESHOLD = 200;
 
-function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (path: string) => void }) {
+// Module-level stable references to avoid creating new arrays/objects on every render
+const remarkPlugins = [remarkGfm];
+const rehypePlugins = [rehypeHighlight];
+
+const MarkdownContent = React.memo(function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (path: string) => void }) {
+  const components = useMemo(() => ({
+    a: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { children?: React.ReactNode }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseDown={(e) => e.preventDefault()}
+        {...props}
+      >
+        {children}
+      </a>
+    ),
+    pre: ({ children, ...props }: React.HTMLAttributes<HTMLPreElement> & { children?: React.ReactNode }) => {
+      const extractText = (node: React.ReactNode): string => {
+        if (typeof node === "string") return node;
+        if (Array.isArray(node)) return node.map(extractText).join("");
+        if (node && typeof node === "object" && "props" in node) {
+          return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+        }
+        return "";
+      };
+      const codeText = extractText(children);
+      return (
+        <div className="relative group/code">
+          <button
+            onClick={() => navigator.clipboard.writeText(codeText)}
+            className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
+            title="Copy code"
+          >
+            Copy
+          </button>
+          <pre {...props}>{children}</pre>
+        </div>
+      );
+    },
+    table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement> & { children?: React.ReactNode }) => (
+      <div className="overflow-x-auto max-w-full">
+        <table {...props}>{children}</table>
+      </div>
+    ),
+    code: ({ children, className, ...props }: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode }) => {
+      if (className?.includes("language-mermaid")) {
+        const chart = typeof children === "string" ? children : String(children ?? "");
+        return <MermaidBlock chart={chart.trim()} />;
+      }
+      if (className) {
+        return <code className={className} {...props}>{children}</code>;
+      }
+      const codeText = typeof children === "string" ? children : String(children ?? "");
+      if (onOpenFile && isFilePath(codeText)) {
+        const cleanPath = codeText.replace(/:\d+(-\d+)?$/, "");
+        return (
+          <code
+            className="cursor-pointer hover:underline hover:text-blue-300"
+            onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
+            title="Open in File Explorer"
+            {...props}
+          >
+            {children}
+          </code>
+        );
+      }
+      return <code {...props}>{children}</code>;
+    },
+  }), [onOpenFile]);
+
   return (
     <div className="prose prose-invert prose-sm max-w-none
       prose-headings:text-gray-100 prose-headings:mt-3 prose-headings:mb-1
@@ -1162,80 +1189,17 @@ function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (pat
       prose-strong:text-gray-100
     ">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          a: ({ children, href }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              {children}
-            </a>
-          ),
-          pre: ({ children, ...props }) => {
-            const extractText = (node: React.ReactNode): string => {
-              if (typeof node === "string") return node;
-              if (Array.isArray(node)) return node.map(extractText).join("");
-              if (node && typeof node === "object" && "props" in node) {
-                return extractText((node as React.ReactElement<{ children?: React.ReactNode }>).props.children);
-              }
-              return "";
-            };
-            const text = extractText(children);
-            return (
-              <div className="relative group/code">
-                <button
-                  onClick={() => navigator.clipboard.writeText(text)}
-                  className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600 text-gray-300 rounded px-1.5 py-0.5 text-[10px]"
-                  title="Copy code"
-                >
-                  Copy
-                </button>
-                <pre {...props}>{children}</pre>
-              </div>
-            );
-          },
-          table: ({ children, ...props }) => (
-            <div className="overflow-x-auto max-w-full">
-              <table {...props}>{children}</table>
-            </div>
-          ),
-          code: ({ children, className, ...props }) => {
-            if (className?.includes("language-mermaid")) {
-              const chart = typeof children === "string" ? children : String(children ?? "");
-              return <MermaidBlock chart={chart.trim()} />;
-            }
-            if (className) {
-              return <code className={className} {...props}>{children}</code>;
-            }
-            const codeText = typeof children === "string" ? children : String(children ?? "");
-            if (onOpenFile && isFilePath(codeText)) {
-              const cleanPath = codeText.replace(/:\d+(-\d+)?$/, "");
-              return (
-                <code
-                  className="cursor-pointer hover:underline hover:text-blue-300"
-                  onClick={(e) => { e.stopPropagation(); onOpenFile(cleanPath); }}
-                  title="Open in File Explorer"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-            return <code {...props}>{children}</code>;
-          },
-        }}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
       >
         {text}
       </ReactMarkdown>
     </div>
   );
-}
+});
 
-function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
+const MessageBubble = React.memo(function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") {
     return <ExitPlanModeBlock entry={entry} />;
   }
@@ -1331,9 +1295,9 @@ function MessageBubble({ entry, onOpenFile }: { entry: ConversationEntry; onOpen
       <MarkdownContent text={entry.text} onOpenFile={onOpenFile} />
     </div>
   );
-}
+});
 
-function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
+const AgentResultBlock = React.memo(function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onOpenFile?: (path: string) => void }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number>(0);
   const [expanded, setExpanded] = useState(false);
@@ -1386,9 +1350,9 @@ function AgentResultBlock({ entry, onOpenFile }: { entry: ConversationEntry; onO
       </div>
     </div>
   );
-}
+});
 
-function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
+const ExitPlanModeBlock = React.memo(function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
   let parsedInput: Record<string, unknown> | null = null;
   try {
     parsedInput = JSON.parse(entry.toolInput ?? "{}");
@@ -1408,9 +1372,9 @@ function ExitPlanModeBlock({ entry }: { entry: ConversationEntry }) {
       </div>
     </div>
   );
-}
+});
 
-function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
+const ToolUseBlock = React.memo(function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const summary = toolUseSummary(entry.toolName ?? "", entry.toolInput ?? "");
 
@@ -1456,9 +1420,9 @@ function ToolUseBlock({ entry }: { entry: ConversationEntry }) {
       )}
     </div>
   );
-}
+});
 
-function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
+const ActiveToolIndicator = React.memo(function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
   const summary = toolUseSummary(entry.toolName ?? "", entry.toolInput ?? "");
   return (
     <div className="my-1">
@@ -1474,9 +1438,9 @@ function ActiveToolIndicator({ entry }: { entry: ConversationEntry }) {
       </div>
     </div>
   );
-}
+});
 
-function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
+const EditDiff = React.memo(function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
   const oldLines = oldStr.split("\n");
   const newLines = newStr.split("\n");
 
@@ -1494,9 +1458,9 @@ function EditDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
       ))}
     </pre>
   );
-}
+});
 
-function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
+const ToolResultBlock = React.memo(function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
   const [expanded, setExpanded] = useState(false);
   const text = entry.text || "";
   const lines = text.split("\n");
@@ -1540,9 +1504,9 @@ function ToolResultBlock({ entry }: { entry: ConversationEntry }) {
       )}
     </div>
   );
-}
+});
 
-function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boolean }) {
+const TaskOverlay = React.memo(function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -1616,7 +1580,7 @@ function TaskOverlay({ tasks, searchOpen }: { tasks: TaskItem[]; searchOpen: boo
       )}
     </div>
   );
-}
+});
 
 function toolUseSummary(name: string, inputJson: string): string {
   try {
@@ -1676,3 +1640,184 @@ function formatToolInput(inputJson: string): string {
 function sendResize(ws: WebSocket, cols: number, rows: number) {
   ws.send(JSON.stringify({ type: "resize", cols, rows }));
 }
+
+// ─── TextareaOverlay ──────────────────────────────────────────────────────────
+// Owns `textareaValue` state internally so that typing does NOT cause
+// SessionPanel to re-render (and therefore does not invalidate the expensive
+// memoized conversation list).
+
+interface TextareaOverlayProps {
+  textareaMode: boolean;
+  editorMode: boolean;
+  /** Initial content injected by the parent when editor_open arrives. */
+  initialValue: string;
+  onSend: (value: string) => void;
+  onCancel: () => void;
+  onEditorDone: (value: string) => void;
+  onEditorCancel: () => void;
+  onShowToast: (msg: string) => void;
+}
+
+const TextareaOverlay = React.memo(function TextareaOverlay({
+  textareaMode,
+  editorMode,
+  initialValue,
+  onSend,
+  onCancel,
+  onEditorDone,
+  onEditorCancel,
+  onShowToast,
+}: TextareaOverlayProps) {
+  const [textareaValue, setTextareaValue] = useState(initialValue);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync textareaValue when the parent opens the overlay with a new initial value
+  // (e.g. editor_open message from WebSocket).
+  useEffect(() => {
+    if (textareaMode) {
+      setTextareaValue(initialValue);
+    }
+  }, [initialValue, textareaMode]);
+
+  // Focus textarea whenever the overlay becomes visible
+  useEffect(() => {
+    if (textareaMode) {
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [textareaMode]);
+
+  const handleImagePasteTextarea = useCallback(
+    async (e: React.ClipboardEvent) => {
+      const files = e.clipboardData?.files;
+      if (!files || files.length === 0) return;
+
+      const imageFile = Array.from(files).find((f) => f.type.startsWith("image/"));
+      if (!imageFile) return;
+
+      e.preventDefault();
+
+      const MAX = 10 * 1024 * 1024;
+      if (imageFile.size > MAX) {
+        onShowToast("Image exceeds 10 MB limit");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", imageFile);
+
+      try {
+        const res = await fetch("/api/images/save", { method: "POST", body: formData, credentials: "include" });
+        if (!res.ok) {
+          const text = await res.text();
+          onShowToast(`Failed to save image: ${text}`);
+          return;
+        }
+        const { path } = await res.json() as { path: string };
+
+        const ta = textareaRef.current;
+        if (!ta) return;
+        const start = ta.selectionStart ?? ta.value.length;
+        const end = ta.selectionEnd ?? ta.value.length;
+        const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
+        setTextareaValue(newValue);
+        requestAnimationFrame(() => {
+          ta.selectionStart = start + path.length;
+          ta.selectionEnd = start + path.length;
+        });
+      } catch {
+        onShowToast("Failed to save image");
+      }
+    },
+    [onShowToast]
+  );
+
+  if (!textareaMode) return null;
+
+  return (
+    <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
+      <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-400 border-b border-gray-700 shrink-0">
+        <span>Textarea Mode — <kbd className="bg-gray-700 px-1 rounded">⌘Enter</kbd> to send, <kbd className="bg-gray-700 px-1 rounded">Esc</kbd> to cancel</span>
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={textareaValue}
+        onChange={(e) => setTextareaValue(e.target.value)}
+        onPaste={handleImagePasteTextarea}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (editorMode) {
+              onEditorDone(textareaValue);
+            } else if (textareaValue) {
+              onSend(textareaValue);
+            }
+            setTextareaValue("");
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            if (editorMode) {
+              onEditorCancel();
+            } else {
+              onCancel();
+            }
+            setTextareaValue("");
+          }
+        }}
+        className="flex-1 w-full p-2 text-sm text-gray-200 resize-none outline-none"
+        style={{
+          background: "#0a0a0f",
+          fontFamily: "Menlo, Monaco, 'Courier New', monospace",
+          fontSize: 12,
+        }}
+        spellCheck={false}
+      />
+    </div>
+  );
+});
+
+// ─── SuggestionsBar ───────────────────────────────────────────────────────────
+// Extracted so that suggestions state changes don't re-render SessionPanel's
+// expensive conversation list.
+
+interface SuggestionsBarProps {
+  suggestions: { label: string; message: string }[];
+  suggestionsLoading: boolean;
+  running: boolean;
+  onSuggestionClick: (message: string) => void;
+}
+
+const SuggestionsBar = React.memo(function SuggestionsBar({
+  suggestions,
+  suggestionsLoading,
+  running,
+  onSuggestionClick,
+}: SuggestionsBarProps) {
+  if (!suggestionsLoading && (suggestions.length === 0 || running)) return null;
+
+  return (
+    <>
+      {suggestionsLoading && (
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <svg className="animate-spin h-3.5 w-3.5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span className="text-xs text-gray-400">Suggesting replies...</span>
+        </div>
+      )}
+      {suggestions.length > 0 && !running && (
+        <div className="flex gap-2 flex-wrap px-1 pb-1">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onSuggestionClick(s.message)}
+              className="text-xs px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/50 transition-colors cursor-pointer"
+              title={s.message}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+});
