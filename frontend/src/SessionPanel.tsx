@@ -113,6 +113,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [textareaValue, setTextareaValue] = useState("");
   const [editorMode, setEditorMode] = useState(false); // true when opened via $EDITOR
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const effectiveDir = worktreeDir || cwd || "";
 
@@ -125,6 +126,60 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
     termRef.current?.focus();
   }, []);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
+  const handleImagePaste = useCallback(
+    async (e: ClipboardEvent | React.ClipboardEvent, mode: "terminal" | "textarea") => {
+      const files = e.clipboardData?.files;
+      if (!files || files.length === 0) return;
+
+      const imageFile = Array.from(files).find((f) => f.type.startsWith("image/"));
+      if (!imageFile) return;
+
+      e.preventDefault();
+
+      const MAX = 10 * 1024 * 1024;
+      if (imageFile.size > MAX) {
+        showToast("Image exceeds 10 MB limit");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", imageFile);
+
+      try {
+        const res = await fetch("/api/images/save", { method: "POST", body: formData });
+        if (!res.ok) {
+          const text = await res.text();
+          showToast(`Failed to save image: ${text}`);
+          return;
+        }
+        const { path } = await res.json() as { path: string };
+
+        if (mode === "terminal") {
+          sendInputToTerminal(path);
+        } else {
+          const ta = textareaRef.current;
+          if (!ta) return;
+          const start = ta.selectionStart ?? ta.value.length;
+          const end = ta.selectionEnd ?? ta.value.length;
+          const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
+          setTextareaValue(newValue);
+          requestAnimationFrame(() => {
+            ta.selectionStart = start + path.length;
+            ta.selectionEnd = start + path.length;
+          });
+        }
+      } catch {
+        showToast("Failed to save image");
+      }
+    },
+    [sendInputToTerminal, showToast]
+  );
 
   // Focus textarea when entering textarea mode
   useEffect(() => {
@@ -594,6 +649,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     document.addEventListener("mouseup", onUp);
   }, []);
 
+  // handleImagePaste will be wired to paste events in a subsequent step
+  void handleImagePaste;
+
   return (
     <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border-2 ${isFocused ? "border-blue-500/50" : "border-transparent transition-colors duration-500"}`}>
       {/* Chat panel (top) */}
@@ -972,6 +1030,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-red-700 text-white text-xs px-4 py-2 rounded shadow-lg pointer-events-none">
+          {toastMessage}
         </div>
       )}
     </div>
