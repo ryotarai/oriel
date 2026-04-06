@@ -639,17 +639,12 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 	// Generate suggestions in background and broadcast to subscribers
 	go func() {
 		claudeSessionID := payload.SessionID
-		sessionCwd := payload.CWD
-		if claudeSessionID == "" || sessionCwd == "" {
-			s.mu.Lock()
-			if claudeSessionID == "" {
-				claudeSessionID = s.claudeSessionID
-			}
-			if sessionCwd == "" {
-				sessionCwd = s.cwd
-			}
-			s.mu.Unlock()
+		s.mu.Lock()
+		if claudeSessionID == "" {
+			claudeSessionID = s.claudeSessionID
 		}
+		sessionCwd := s.cwd
+		s.mu.Unlock()
 
 		if claudeSessionID == "" {
 			slog.Warn("Cannot generate suggestions: no Claude session ID", "session", sessionID)
@@ -660,7 +655,7 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 
 		suggestions, err := h.generateSuggestions(claudeSessionID, sessionCwd)
 		if err != nil {
-			slog.Warn("Suggestions generation failed", "session", sessionID, "error", err)
+			slog.Warn("Suggestions generation failed", "session", sessionID, "claudeSession", claudeSessionID, "cwd", sessionCwd, "error", err)
 			h.broadcast(s, message{Type: "suggestions_error", Data: err.Error()})
 			return
 		}
