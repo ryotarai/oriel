@@ -1241,10 +1241,14 @@ const MessageBubble = React.memo(function MessageBubble({ entry, onOpenFile }: {
     const slashCmd = parseSlashCommand(entry.text);
     if (slashCmd) {
       return (
-        <div className="flex justify-start">
-          <div className="inline-flex items-center gap-1 rounded-full bg-gray-800 border border-gray-700 px-3 py-1 text-xs text-gray-400">
-            <span className="font-mono">{slashCmd.name}</span>
-            {slashCmd.args && <span className="text-gray-500">{slashCmd.args}</span>}
+        <div className="my-1">
+          <div className="rounded-lg bg-gray-800/60 border border-gray-700/50 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs mb-2">
+              <span className="text-blue-400 font-medium">{slashCmd.name}</span>
+            </div>
+            {slashCmd.args && (
+              <MarkdownContent text={slashCmd.args} />
+            )}
           </div>
         </div>
       );
