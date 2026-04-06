@@ -200,8 +200,11 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	// Add images directory to Claude's allowed dirs so pasted images don't require permission prompts.
 	if home, err := os.UserHomeDir(); err == nil {
 		imagesDir := filepath.Join(home, ".local", "oriel", "images")
-		os.MkdirAll(imagesDir, 0o700)
-		allArgs = append(allArgs, "--add-dir", imagesDir)
+		if err := os.MkdirAll(imagesDir, 0o700); err != nil {
+			slog.Warn("Failed to create images directory", "path", imagesDir, "error", err)
+		} else {
+			allArgs = append(allArgs, "--add-dir", imagesDir)
+		}
 	}
 
 	// Create a hook script that includes the auth token
