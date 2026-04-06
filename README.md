@@ -143,6 +143,13 @@ When Claude invokes `$EDITOR` (e.g., for interactive file editing), Oriel opens 
 | `-state-db` | `~/.config/oriel/state.sqlite3` | Path to the SQLite state database |
 | `-log-level` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
 
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ORIEL_CONFIG_DIR` | `~/.config/oriel` | Override the configuration directory (config.json, state.sqlite3) |
+| `ORIEL_LOCAL_DIR` | `~/.local/oriel` | Override the local data directory (debug.log, images/) |
+
 ```bash
 # Listen on a different port
 oriel -listen-addr localhost:3000
