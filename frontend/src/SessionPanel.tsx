@@ -488,6 +488,17 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     return () => observer.disconnect();
   }, []);
 
+  // Build a Map from toolUseId → entry for O(1) lookup (avoids O(n²) entries.find() in filter)
+  const toolUseEntryMap = useMemo(() => {
+    const map = new Map<string, ConversationEntry>();
+    for (const e of entries) {
+      if (e.type === "tool_use" && e.toolUseId) {
+        map.set(e.toolUseId, e);
+      }
+    }
+    return map;
+  }, [entries]);
+
   // Extract task state from conversation entries (useMemo avoids double-render vs useEffect+setState)
   const tasks = useMemo(() => {
     const taskMap = new Map<string, TaskItem>();
@@ -508,9 +519,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     // Pass 2: resolve numeric taskIds from tool_result entries so TaskUpdate can match
     for (const entry of entries) {
       if (entry.type !== "tool_result" || !entry.toolUseId) continue;
-      const matchingUse = entries.find(
-        (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId && e.toolName === "TaskCreate"
-      );
+      const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+      if (matchingUse?.toolName !== "TaskCreate") continue;
       if (matchingUse && entry.text) {
         const idMatch = entry.text.match(/Task #(\d+)/i) || entry.text.match(/#(\d+)/);
         if (idMatch) {
@@ -541,7 +551,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     }
 
     return Array.from(taskMap.values());
-  }, [entries]);
+  }, [entries, toolUseEntryMap]);
 
 
 
@@ -680,17 +690,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   }, []);
-
-  // Build a Map from toolUseId → entry for O(1) lookup (avoids O(n²) entries.find() in filter)
-  const toolUseEntryMap = useMemo(() => {
-    const map = new Map<string, ConversationEntry>();
-    for (const e of entries) {
-      if (e.type === "tool_use" && e.toolUseId) {
-        map.set(e.toolUseId, e);
-      }
-    }
-    return map;
-  }, [entries]);
 
   // Memoize the filtered conversation entries to avoid recomputing on every render
   const filteredEntries = useMemo(() => {
