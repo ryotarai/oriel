@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	SwapEnterKeys bool `json:"swapEnterKeys"`
+	SwapEnterKeys        bool `json:"swapEnterKeys"`
+	SwapPaneWidthOnFocus bool `json:"swapPaneWidthOnFocus"`
 }
 
 var (
