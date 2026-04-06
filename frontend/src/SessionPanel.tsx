@@ -98,7 +98,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const [diffFiles, setDiffFiles] = useState<FileDiffData[]>([]);
   const [fileToOpen, setFileToOpen] = useState<string | null>(null);
   const [showTools, setShowTools] = useState(false);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  // tasks is derived from entries; computed with useMemo to avoid double-render
+
   const [worktreeDir, setWorktreeDir] = useState("");
   const [running, setRunning] = useState(false);
   const [suggestions, setSuggestions] = useState<{ label: string; message: string }[]>([]);
@@ -487,8 +488,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     return () => observer.disconnect();
   }, []);
 
-  // Extract task state from conversation entries
-  useEffect(() => {
+  // Extract task state from conversation entries (useMemo avoids double-render vs useEffect+setState)
+  const tasks = useMemo(() => {
     const taskMap = new Map<string, TaskItem>();
 
     // Pass 1: process TaskCreate tool_use entries, keyed by toolUseId
@@ -539,7 +540,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       } catch {}
     }
 
-    setTasks(Array.from(taskMap.values()));
+    return Array.from(taskMap.values());
   }, [entries]);
 
 
@@ -680,6 +681,83 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     document.addEventListener("mouseup", onUp);
   }, []);
 
+  // Build a Map from toolUseId → entry for O(1) lookup (avoids O(n²) entries.find() in filter)
+  const toolUseEntryMap = useMemo(() => {
+    const map = new Map<string, ConversationEntry>();
+    for (const e of entries) {
+      if (e.type === "tool_use" && e.toolUseId) {
+        map.set(e.toolUseId, e);
+      }
+    }
+    return map;
+  }, [entries]);
+
+  // Memoize the filtered conversation entries to avoid recomputing on every render
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry) => {
+      // Always show ExitPlanMode tool_use (rendered as markdown plan)
+      if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") return true;
+      if (!showTools && entry.type === "tool_use") return false;
+      if (!showTools && entry.type === "tool_result") {
+        // Show Agent tool results even when tools are hidden
+        const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+        if (!matchingUse || matchingUse.toolName !== "Agent") return false;
+      }
+      // Hide TaskCreate/TaskUpdate tool blocks (shown as overlay instead)
+      if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
+        return false;
+      }
+      // Hide tool results for TaskCreate, TaskUpdate
+      if (entry.type === "tool_result") {
+        const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+        if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate" || matchingUse.toolName === "ExitPlanMode")) {
+          return false;
+        }
+        // Hide successful Edit/Write results but show errors
+        if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write") && !entry.isError) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [entries, showTools, toolUseEntryMap]);
+
+  // Memoize the rendered conversation list to avoid re-rendering when unrelated state changes
+  const renderedEntries = useMemo(() => {
+    return filteredEntries.map((entry, idx, arr) => {
+      // Render Agent tool results as assistant messages (markdown)
+      const isAgentResult = entry.type === "tool_result" && (() => {
+        const matchingUse = toolUseEntryMap.get(entry.toolUseId ?? "");
+        return matchingUse?.toolName === "Agent";
+      })();
+      const isCurrentSearchMatch = searchQuery && searchMatches[currentMatchIdx]?.uuid === entry.uuid;
+      const isAnySearchMatch = searchQuery && entry.text?.toLowerCase().includes(searchQuery.toLowerCase());
+      const prevTimestamp = idx > 0 ? arr[idx - 1].timestamp : undefined;
+      const showTs = shouldShowTimestamp(prevTimestamp, entry.timestamp);
+      return (
+        <div key={entry.uuid}>
+          {showTs && entry.timestamp && (
+            <div className="text-center text-[10px] text-gray-600 py-1">
+              {formatTimestamp(entry.timestamp)}
+            </div>
+          )}
+          <div
+            id={`msg-${entry.uuid}`}
+            className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
+          >
+            {isAgentResult ? (
+              <AgentResultBlock entry={entry} onOpenFile={openFileInExplorer} />
+            ) : (
+              <MessageBubble
+                entry={entry}
+                onOpenFile={openFileInExplorer}
+              />
+            )}
+          </div>
+        </div>
+      );
+    });
+  }, [filteredEntries, searchQuery, searchMatches, currentMatchIdx, openFileInExplorer, toolUseEntryMap]);
 
   return (
     <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border-2 ${isFocused ? "border-blue-500/50" : "border-transparent transition-colors duration-500"}`}>
@@ -798,70 +876,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
                   Messages will appear here...
                 </div>
               )}
-              {entries.filter((entry) => {
-                // Always show ExitPlanMode tool_use (rendered as markdown plan)
-                if (entry.type === "tool_use" && entry.toolName === "ExitPlanMode") return true;
-                if (!showTools && entry.type === "tool_use") return false;
-                if (!showTools && entry.type === "tool_result") {
-                  // Show Agent tool results even when tools are hidden
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
-                  );
-                  if (!matchingUse || matchingUse.toolName !== "Agent") return false;
-                }
-                // Hide TaskCreate/TaskUpdate tool blocks (shown as overlay instead)
-                if (entry.type === "tool_use" && (entry.toolName === "TaskCreate" || entry.toolName === "TaskUpdate")) {
-                  return false;
-                }
-                // Hide tool results for TaskCreate, TaskUpdate
-                if (entry.type === "tool_result") {
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
-                  );
-                  if (matchingUse && (matchingUse.toolName === "TaskCreate" || matchingUse.toolName === "TaskUpdate" || matchingUse.toolName === "ExitPlanMode")) {
-                    return false;
-                  }
-                  // Hide successful Edit/Write results but show errors
-                  if (matchingUse && (matchingUse.toolName === "Edit" || matchingUse.toolName === "Write") && !entry.isError) {
-                    return false;
-                  }
-                }
-                return true;
-              }).map((entry, idx, arr) => {
-                // Render Agent tool results as assistant messages (markdown)
-                const isAgentResult = entry.type === "tool_result" && (() => {
-                  const matchingUse = entries.find(
-                    (e) => e.type === "tool_use" && e.toolUseId === entry.toolUseId
-                  );
-                  return matchingUse?.toolName === "Agent";
-                })();
-                const isCurrentSearchMatch = searchQuery && searchMatches[currentMatchIdx]?.uuid === entry.uuid;
-                const isAnySearchMatch = searchQuery && entry.text?.toLowerCase().includes(searchQuery.toLowerCase());
-                const prevTimestamp = idx > 0 ? arr[idx - 1].timestamp : undefined;
-                const showTs = shouldShowTimestamp(prevTimestamp, entry.timestamp);
-                return (
-                  <div key={entry.uuid}>
-                    {showTs && entry.timestamp && (
-                      <div className="text-center text-[10px] text-gray-600 py-1">
-                        {formatTimestamp(entry.timestamp)}
-                      </div>
-                    )}
-                    <div
-                      id={`msg-${entry.uuid}`}
-                      className={isAnySearchMatch ? (isCurrentSearchMatch ? "ring-2 ring-yellow-500/50 rounded-lg" : "ring-1 ring-yellow-500/20 rounded-lg") : ""}
-                    >
-                      {isAgentResult ? (
-                        <AgentResultBlock entry={entry} onOpenFile={openFileInExplorer} />
-                      ) : (
-                        <MessageBubble
-                          entry={entry}
-                          onOpenFile={openFileInExplorer}
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {renderedEntries}
               {/* Active tool indicator: show even when tools are hidden */}
               {activeToolEntry && <ActiveToolIndicator entry={activeToolEntry} />}
               <div ref={chatEndRef} />
