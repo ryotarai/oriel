@@ -149,6 +149,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
       e.preventDefault();
 
+      if (mode === "terminal") {
+        // Send an empty bracketed paste sequence (ESC[200~ ESC[201~).
+        // Claude Code CLI detects isPasted:true && input.length===0 and calls
+        // checkClipboardForImage(), which reads the image from the OS clipboard
+        // directly via osascript — no file saving needed on our side.
+        sendInputToTerminal("\x1b[200~\x1b[201~");
+        return;
+      }
+
+      // textarea mode: save image to disk and insert the file path at cursor.
       const MAX = 10 * 1024 * 1024;
       if (imageFile.size > MAX) {
         showToast("Image exceeds 10 MB limit");
@@ -159,7 +169,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       formData.append("image", imageFile);
 
       try {
-        const res = await fetch("/api/images/save", { method: "POST", body: formData });
+        const res = await fetch("/api/images/save", { method: "POST", body: formData, credentials: "include" });
         if (!res.ok) {
           const text = await res.text();
           showToast(`Failed to save image: ${text}`);
@@ -167,26 +177,27 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         }
         const { path } = await res.json() as { path: string };
 
-        if (mode === "terminal") {
-          sendInputToTerminal(path);
-        } else {
-          const ta = textareaRef.current;
-          if (!ta) return;
-          const start = ta.selectionStart ?? ta.value.length;
-          const end = ta.selectionEnd ?? ta.value.length;
-          const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
-          setTextareaValue(newValue);
-          requestAnimationFrame(() => {
-            ta.selectionStart = start + path.length;
-            ta.selectionEnd = start + path.length;
-          });
-        }
+        const ta = textareaRef.current;
+        if (!ta) return;
+        const start = ta.selectionStart ?? ta.value.length;
+        const end = ta.selectionEnd ?? ta.value.length;
+        const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
+        setTextareaValue(newValue);
+        requestAnimationFrame(() => {
+          ta.selectionStart = start + path.length;
+          ta.selectionEnd = start + path.length;
+        });
       } catch {
         showToast("Failed to save image");
       }
     },
     [sendInputToTerminal, showToast, textareaRef]
   );
+
+  // Keep a ref to the latest handleImagePaste so it can be used in the xterm init effect
+  // without needing to re-initialize the terminal when the callback changes.
+  const handleImagePasteRef = useRef(handleImagePaste);
+  useEffect(() => { handleImagePasteRef.current = handleImagePaste; }, [handleImagePaste]);
 
   useEffect(() => {
     return () => {
@@ -379,6 +390,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     });
     term.textarea?.addEventListener("blur", () => {
       term.options.cursorBlink = false;
+    });
+
+    // Handle image paste in terminal mode. We attach directly to term.textarea because
+    // xterm calls stopPropagation() on paste events, preventing them from reaching
+    // the container div. Handlers on the same element are not blocked by stopPropagation().
+    term.textarea?.addEventListener("paste", (e: ClipboardEvent) => {
+      handleImagePasteRef.current(e, "terminal");
     });
 
     const observer = new ResizeObserver(() => fit.fit());
@@ -918,7 +936,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         <div
           ref={containerRef}
           className={`h-full ${textareaMode ? "invisible" : ""}`}
-          onPaste={(e) => handleImagePaste(e as unknown as ClipboardEvent, "terminal")}
         />
         {textareaMode && (
           <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
