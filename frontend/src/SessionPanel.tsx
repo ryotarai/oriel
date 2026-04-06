@@ -46,13 +46,17 @@ interface SessionPanelProps {
   isFocused?: boolean;
   resumeSessionId?: string; // real Claude CLI session UUID for --resume
   onClaudeSessionId?: (uuid: string) => void;
+  isActiveTab?: boolean;
 }
 
-export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, isFocused, cwd, onCwdChange, resumeSessionId, onClaudeSessionId }, ref) {
+export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(function SessionPanel({ sessionId, dragHandleProps, swapEnterKeys, isFocused, cwd, onCwdChange, resumeSessionId, onClaudeSessionId, isActiveTab }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const hasConnectedRef = useRef(false);
+  const isActiveTabRef = useRef(isActiveTab ?? true);
+  const connectWsTrigger = useRef<(() => void) | null>(null);
   const [connected, setConnected] = useState(false);
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
   const seenUUIDs = useRef(new Set<string>());
@@ -234,6 +238,10 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     let intentionalClose = false;
 
     function connectWs() {
+      // Skip connection if tab has never been active
+      if (!isActiveTabRef.current && !hasConnectedRef.current) return;
+      hasConnectedRef.current = true;
+
       const cwdParam = cwd ? `&cwd=${encodeURIComponent(cwd)}` : "";
       const resumeParam = resumeSessionId ? `&resume=${encodeURIComponent(resumeSessionId)}` : "";
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -321,6 +329,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       };
     }
 
+    // Expose connectWs so the isActiveTab watcher effect can trigger connection
+    connectWsTrigger.current = connectWs;
+
     connectWs();
 
     // Plain Enter → Ctrl+J (newline) when swap is enabled, otherwise normal Enter
@@ -379,12 +390,23 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
     return () => {
       intentionalClose = true;
+      connectWsTrigger.current = null;
+      hasConnectedRef.current = false;
       if (reconnectTimerId) clearTimeout(reconnectTimerId);
       observer.disconnect();
       wsRef.current?.close();
       term.dispose();
     };
   }, [sessionId, handleConversation]);
+
+  // When isActiveTab becomes true, trigger WebSocket connection if not yet connected
+  useEffect(() => {
+    isActiveTabRef.current = isActiveTab ?? true;
+    if (!isActiveTab) return;
+    if (hasConnectedRef.current) return; // Already connected once
+    const trigger = connectWsTrigger.current;
+    if (trigger) trigger();
+  }, [isActiveTab]);
 
   // Re-fit when vertical split changes
   useEffect(() => {
