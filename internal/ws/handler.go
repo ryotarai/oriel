@@ -660,7 +660,7 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 
 		suggestions, err := h.generateSuggestions(claudeSessionID, sessionCwd)
 		if err != nil {
-			slog.Warn("Suggestions generation failed", "session", sessionID, "error", err)
+			slog.Warn("Suggestions generation failed", "session", sessionID, "claudeSession", claudeSessionID, "cwd", sessionCwd, "error", err)
 			h.broadcast(s, message{Type: "suggestions_error", Data: err.Error()})
 			return
 		}
