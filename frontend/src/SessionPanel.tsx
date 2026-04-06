@@ -111,9 +111,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [textareaMode, setTextareaMode] = useState(false);
-  const [textareaValue, setTextareaValue] = useState("");
   const [editorMode, setEditorMode] = useState(false); // true when opened via $EDITOR
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editorInitialValue, setEditorInitialValue] = useState(""); // initial value for editor_open
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -141,7 +140,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
   }, []);
 
   const handleImagePaste = useCallback(
-    async (e: ClipboardEvent | React.ClipboardEvent, mode: "terminal" | "textarea") => {
+    async (e: ClipboardEvent | React.ClipboardEvent, mode: "terminal") => {
       const files = e.clipboardData?.files;
       if (!files || files.length === 0) return;
 
@@ -158,41 +157,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         sendInputToTerminal("\x1b[200~\x1b[201~");
         return;
       }
-
-      // textarea mode: save image to disk and insert the file path at cursor.
-      const MAX = 10 * 1024 * 1024;
-      if (imageFile.size > MAX) {
-        showToast("Image exceeds 10 MB limit");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("image", imageFile);
-
-      try {
-        const res = await fetch("/api/images/save", { method: "POST", body: formData, credentials: "include" });
-        if (!res.ok) {
-          const text = await res.text();
-          showToast(`Failed to save image: ${text}`);
-          return;
-        }
-        const { path } = await res.json() as { path: string };
-
-        const ta = textareaRef.current;
-        if (!ta) return;
-        const start = ta.selectionStart ?? ta.value.length;
-        const end = ta.selectionEnd ?? ta.value.length;
-        const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
-        setTextareaValue(newValue);
-        requestAnimationFrame(() => {
-          ta.selectionStart = start + path.length;
-          ta.selectionEnd = start + path.length;
-        });
-      } catch {
-        showToast("Failed to save image");
-      }
     },
-    [sendInputToTerminal, showToast, textareaRef]
+    [sendInputToTerminal]
   );
 
   // Keep a ref to the latest handleImagePaste so it can be used in the xterm init effect
@@ -205,13 +171,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
     };
   }, []);
-
-  // Focus textarea when entering textarea mode
-  useEffect(() => {
-    if (textareaMode) {
-      setTimeout(() => textareaRef.current?.focus(), 0);
-    }
-  }, [textareaMode]);
 
   const openFileInExplorer = useCallback((path: string) => {
     setFileToOpen(path);
@@ -333,8 +292,8 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setRefreshTrigger(c => c + 1);
         } else if (msg.type === "editor_open") {
           setEditorMode(true);
+          setEditorInitialValue(msg.data || "");
           setTextareaMode(true);
-          setTextareaValue(msg.data || "");
         }
       };
 
@@ -694,6 +653,48 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     document.addEventListener("mouseup", onUp);
   }, []);
 
+  // TextareaOverlay callbacks
+  const handleTextareaSend = useCallback((value: string) => {
+    sendInputToTerminal(value);
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, [sendInputToTerminal]);
+
+  const handleTextareaCancel = useCallback(() => {
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, []);
+
+  const handleEditorDone = useCallback((value: string) => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      const bytes = new TextEncoder().encode(value);
+      const base64 = btoa(String.fromCharCode(...bytes));
+      ws.send(JSON.stringify({ type: "editor_done", data: base64 }));
+    }
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, []);
+
+  const handleEditorCancel = useCallback(() => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "editor_cancel" }));
+    }
+    setTextareaMode(false);
+    setEditorMode(false);
+    setTimeout(() => termRef.current?.focus(), 0);
+  }, []);
+
+  // SuggestionsBar callback
+  const handleSuggestionClick = useCallback((message: string) => {
+    sendInputToTerminal(message + "\r");
+    setSuggestions([]);
+  }, [sendInputToTerminal]);
+
   // Memoize the filtered conversation entries to avoid recomputing on every render
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
@@ -883,32 +884,12 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               {activeToolEntry && <ActiveToolIndicator entry={activeToolEntry} />}
               <div ref={chatEndRef} />
               {/* Reply suggestions */}
-              {suggestionsLoading && (
-                <div className="flex items-center gap-2 px-2 py-1.5">
-                  <svg className="animate-spin h-3.5 w-3.5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span className="text-xs text-gray-400">Suggesting replies...</span>
-                </div>
-              )}
-              {suggestions.length > 0 && !running && (
-                <div className="flex gap-2 flex-wrap px-1 pb-1">
-                  {suggestions.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        sendInputToTerminal(s.message + "\r");
-                        setSuggestions([]);
-                      }}
-                      className="text-xs px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/50 transition-colors cursor-pointer"
-                      title={s.message}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <SuggestionsBar
+                suggestions={suggestions}
+                suggestionsLoading={suggestionsLoading}
+                running={running}
+                onSuggestionClick={handleSuggestionClick}
+              />
             </div>
             {showNewMessages && (
               <button
@@ -954,57 +935,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           ref={containerRef}
           className={`h-full ${textareaMode ? "invisible" : ""}`}
         />
-        {textareaMode && (
-          <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
-            <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-400 border-b border-gray-700 shrink-0">
-              <span>Textarea Mode — <kbd className="bg-gray-700 px-1 rounded">⌘Enter</kbd> to send, <kbd className="bg-gray-700 px-1 rounded">Esc</kbd> to cancel</span>
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={textareaValue}
-              onChange={(e) => setTextareaValue(e.target.value)}
-              onPaste={(e) => handleImagePaste(e, "textarea")}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  if (editorMode) {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      const bytes = new TextEncoder().encode(textareaValue);
-                      const base64 = btoa(String.fromCharCode(...bytes));
-                      ws.send(JSON.stringify({ type: "editor_done", data: base64 }));
-                    }
-                  } else if (textareaValue) {
-                    sendInputToTerminal(textareaValue);
-                  }
-                  setEditorMode(false);
-                  setTextareaMode(false);
-                  setTextareaValue("");
-                  setTimeout(() => termRef.current?.focus(), 0);
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  if (editorMode) {
-                    const ws = wsRef.current;
-                    if (ws?.readyState === WebSocket.OPEN) {
-                      ws.send(JSON.stringify({ type: "editor_cancel" }));
-                    }
-                  }
-                  setEditorMode(false);
-                  setTextareaMode(false);
-                  setTextareaValue("");
-                  setTimeout(() => termRef.current?.focus(), 0);
-                }
-              }}
-              className="flex-1 w-full p-2 text-sm text-gray-200 resize-none outline-none"
-              style={{
-                background: "#0a0a0f",
-                fontFamily: "Menlo, Monaco, 'Courier New', monospace",
-                fontSize: 12,
-              }}
-              spellCheck={false}
-            />
-          </div>
-        )}
+        <TextareaOverlay
+          textareaMode={textareaMode}
+          editorMode={editorMode}
+          initialValue={editorInitialValue}
+          onSend={handleTextareaSend}
+          onCancel={handleTextareaCancel}
+          onEditorDone={handleEditorDone}
+          onEditorCancel={handleEditorCancel}
+          onShowToast={showToast}
+        />
       </div>
 
       {/* CWD picker modal */}
@@ -1700,3 +1640,182 @@ function formatToolInput(inputJson: string): string {
 function sendResize(ws: WebSocket, cols: number, rows: number) {
   ws.send(JSON.stringify({ type: "resize", cols, rows }));
 }
+
+// ─── TextareaOverlay ──────────────────────────────────────────────────────────
+// Owns `textareaValue` state internally so that typing does NOT cause
+// SessionPanel to re-render (and therefore does not invalidate the expensive
+// memoized conversation list).
+
+interface TextareaOverlayProps {
+  textareaMode: boolean;
+  editorMode: boolean;
+  /** Initial content injected by the parent when editor_open arrives. */
+  initialValue: string;
+  onSend: (value: string) => void;
+  onCancel: () => void;
+  onEditorDone: (value: string) => void;
+  onEditorCancel: () => void;
+  onShowToast: (msg: string) => void;
+}
+
+const TextareaOverlay = React.memo(function TextareaOverlay({
+  textareaMode,
+  editorMode,
+  initialValue,
+  onSend,
+  onCancel,
+  onEditorDone,
+  onEditorCancel,
+  onShowToast,
+}: TextareaOverlayProps) {
+  const [textareaValue, setTextareaValue] = useState(initialValue);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync textareaValue when the parent opens the overlay with a new initial value
+  // (e.g. editor_open message from WebSocket).
+  useEffect(() => {
+    setTextareaValue(initialValue);
+  }, [initialValue]);
+
+  // Focus textarea whenever the overlay becomes visible
+  useEffect(() => {
+    if (textareaMode) {
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [textareaMode]);
+
+  const handleImagePasteTextarea = useCallback(
+    async (e: React.ClipboardEvent) => {
+      const files = e.clipboardData?.files;
+      if (!files || files.length === 0) return;
+
+      const imageFile = Array.from(files).find((f) => f.type.startsWith("image/"));
+      if (!imageFile) return;
+
+      e.preventDefault();
+
+      const MAX = 10 * 1024 * 1024;
+      if (imageFile.size > MAX) {
+        onShowToast("Image exceeds 10 MB limit");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", imageFile);
+
+      try {
+        const res = await fetch("/api/images/save", { method: "POST", body: formData, credentials: "include" });
+        if (!res.ok) {
+          const text = await res.text();
+          onShowToast(`Failed to save image: ${text}`);
+          return;
+        }
+        const { path } = await res.json() as { path: string };
+
+        const ta = textareaRef.current;
+        if (!ta) return;
+        const start = ta.selectionStart ?? ta.value.length;
+        const end = ta.selectionEnd ?? ta.value.length;
+        const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
+        setTextareaValue(newValue);
+        requestAnimationFrame(() => {
+          ta.selectionStart = start + path.length;
+          ta.selectionEnd = start + path.length;
+        });
+      } catch {
+        onShowToast("Failed to save image");
+      }
+    },
+    [onShowToast]
+  );
+
+  if (!textareaMode) return null;
+
+  return (
+    <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
+      <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-400 border-b border-gray-700 shrink-0">
+        <span>Textarea Mode — <kbd className="bg-gray-700 px-1 rounded">⌘Enter</kbd> to send, <kbd className="bg-gray-700 px-1 rounded">Esc</kbd> to cancel</span>
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={textareaValue}
+        onChange={(e) => setTextareaValue(e.target.value)}
+        onPaste={handleImagePasteTextarea}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (editorMode) {
+              onEditorDone(textareaValue);
+            } else if (textareaValue) {
+              onSend(textareaValue);
+            }
+            setTextareaValue("");
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            if (editorMode) {
+              onEditorCancel();
+            } else {
+              onCancel();
+            }
+            setTextareaValue("");
+          }
+        }}
+        className="flex-1 w-full p-2 text-sm text-gray-200 resize-none outline-none"
+        style={{
+          background: "#0a0a0f",
+          fontFamily: "Menlo, Monaco, 'Courier New', monospace",
+          fontSize: 12,
+        }}
+        spellCheck={false}
+      />
+    </div>
+  );
+});
+
+// ─── SuggestionsBar ───────────────────────────────────────────────────────────
+// Extracted so that suggestions state changes don't re-render SessionPanel's
+// expensive conversation list.
+
+interface SuggestionsBarProps {
+  suggestions: { label: string; message: string }[];
+  suggestionsLoading: boolean;
+  running: boolean;
+  onSuggestionClick: (message: string) => void;
+}
+
+const SuggestionsBar = React.memo(function SuggestionsBar({
+  suggestions,
+  suggestionsLoading,
+  running,
+  onSuggestionClick,
+}: SuggestionsBarProps) {
+  if (!suggestionsLoading && (suggestions.length === 0 || running)) return null;
+
+  return (
+    <>
+      {suggestionsLoading && (
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <svg className="animate-spin h-3.5 w-3.5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span className="text-xs text-gray-400">Suggesting replies...</span>
+        </div>
+      )}
+      {suggestions.length > 0 && !running && (
+        <div className="flex gap-2 flex-wrap px-1 pb-1">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => onSuggestionClick(s.message)}
+              className="text-xs px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:border-blue-500/50 transition-colors cursor-pointer"
+              title={s.message}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+});
