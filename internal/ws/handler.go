@@ -173,11 +173,6 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 	if resumeID != "" && conversation.SessionHasContent(cwd, resumeID) {
 		s.resumeSessionID = resumeID
 		args = []string{"--resume", resumeID}
-		// Pre-load conversation history from the old session
-		oldEntries := conversation.ReadSessionEntries(cwd, resumeID)
-		if len(oldEntries) > 0 {
-			s.convHistory = append(s.convHistory, oldEntries...)
-		}
 	}
 
 	if err := h.startProcess(s, args...); err != nil {
