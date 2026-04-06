@@ -416,6 +416,8 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 			s.mu.Unlock()
 
 			if entry.Type == "reset" {
+				// Clear worktree state on session reset
+				pendingEnterWorktreeToolID = ""
 				s.mu.Lock()
 				s.convHistory = nil
 				s.mu.Unlock()
@@ -425,6 +427,7 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 
 			// Collect this entry and drain any immediately available entries (batching)
 			batch := []conversation.ConversationEntry{entry}
+			resetFound := false
 		drainLoop:
 			for {
 				select {
@@ -433,15 +436,9 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 						break drainLoop
 					}
 					if next.Type == "reset" {
-						// Flush current batch before processing reset
-						h.processBatchWorktree(s, batch, &pendingEnterWorktreeToolID)
-						h.sendConversationBatch(s, batch, epoch)
-						batch = nil
-						s.mu.Lock()
-						s.convHistory = nil
-						s.mu.Unlock()
-						h.broadcast(s, message{Type: "conversation_reset"})
-						continue
+						// Flush current batch first, then handle reset in outer loop
+						resetFound = true
+						break drainLoop
 					}
 					batch = append(batch, next)
 				default:
@@ -449,9 +446,18 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 				}
 			}
 
-			if len(batch) > 0 {
-				h.processBatchWorktree(s, batch, &pendingEnterWorktreeToolID)
-				h.sendConversationBatch(s, batch, epoch)
+			// Process worktree state and send the batch
+			h.processBatchWorktree(s, batch, &pendingEnterWorktreeToolID)
+			h.sendConversationBatch(s, batch, epoch)
+
+			if resetFound {
+				// Clear worktree state on session reset
+				pendingEnterWorktreeToolID = ""
+				s.mu.Lock()
+				s.convHistory = nil
+				s.mu.Unlock()
+				h.broadcast(s, message{Type: "conversation_reset"})
+				continue
 			}
 
 			// After first real conversation entry, broadcast the UUID to save to DB.
