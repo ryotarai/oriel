@@ -197,6 +197,16 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
 
+	// Add images directory to Claude's allowed dirs so pasted images don't require permission prompts.
+	if home, err := os.UserHomeDir(); err == nil {
+		imagesDir := filepath.Join(home, ".local", "oriel", "images")
+		if err := os.MkdirAll(imagesDir, 0o700); err != nil {
+			slog.Warn("Failed to create images directory", "path", imagesDir, "error", err)
+		} else {
+			allArgs = append(allArgs, "--add-dir", imagesDir)
+		}
+	}
+
 	// Create a hook script that includes the auth token
 	hookScriptPath := filepath.Join(os.TempDir(), fmt.Sprintf("oriel-hooks-%s.sh", s.id))
 	hookScriptContent := fmt.Sprintf("#!/bin/sh\ncurl -s -X POST -H 'Content-Type: application/json' -b 'oriel-token=%s' -d @- \"http://%s/api/sessions/%s/$1\"\n",
