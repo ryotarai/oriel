@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"os/exec"
 	"time"
+
+	"github.com/ryotarai/oriel/internal/conversation"
 )
 
 type suggestion struct {
@@ -24,9 +26,14 @@ const suggestionsJSONSchema = `{"type":"object","properties":{"suggestions":{"ty
 const suggestionsPrompt = "Based on the conversation so far, suggest 3-5 possible next messages the user might want to send. Focus on natural follow-up actions like asking for refinements, requesting tests, committing changes, or exploring related topics. Keep labels short and messages actionable. Return ONLY the JSON."
 
 // generateSuggestions calls claude CLI to generate reply suggestions for a session.
-func (h *Handler) generateSuggestions(claudeSessionID string, cwd string) ([]suggestion, error) {
+func (h *Handler) generateSuggestions(claudeSessionID string, _ string) ([]suggestion, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+
+	cwd, err := conversation.FindSessionCWD(claudeSessionID)
+	if err != nil {
+		return nil, fmt.Errorf("find session cwd: %w", err)
+	}
 
 	cmd := exec.CommandContext(ctx, h.command,
 		"--resume", claudeSessionID,
@@ -39,11 +46,9 @@ func (h *Handler) generateSuggestions(claudeSessionID string, cwd string) ([]sug
 		suggestionsPrompt,
 	)
 
-	if cwd != "" {
-		cmd.Dir = cwd
-	}
+	cmd.Dir = cwd
 
-	slog.Debug("Generating suggestions", "claudeSession", claudeSessionID)
+	slog.Debug("Generating suggestions", "claudeSession", claudeSessionID, "cwd", cwd)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

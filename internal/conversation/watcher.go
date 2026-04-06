@@ -121,6 +121,40 @@ func SessionHasContent(cwd, sessionID string) bool {
 	return true
 }
 
+// FindSessionCWD searches ~/.claude/projects/*/SESSION_ID.jsonl for the given
+// session ID and returns the cwd recorded in the first conversation entry.
+// Returns an error if no matching JSONL file is found.
+func FindSessionCWD(sessionID string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	pattern := filepath.Join(home, ".claude", "projects", "*", sessionID+".jsonl")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no JSONL found for session %s", sessionID)
+	}
+	f, err := os.Open(matches[0])
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		var msg Message
+		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+			continue
+		}
+		if msg.CWD != "" {
+			return msg.CWD, nil
+		}
+	}
+	return "", fmt.Errorf("no cwd found in session %s", sessionID)
+}
+
 // WatchSession discovers the session JSONL from the child PID, reads existing
 // entries, then tails for new ones. Runs until ctx is cancelled.
 // If onSessionID is non-nil, it is called with the discovered Claude session UUID.
