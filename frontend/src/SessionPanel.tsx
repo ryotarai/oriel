@@ -662,8 +662,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     document.addEventListener("mouseup", onUp);
   }, []);
 
-  // handleImagePaste will be wired to paste events in a subsequent step
-  void handleImagePaste;
 
   return (
     <div ref={panelRef} className={`h-full flex flex-col overflow-hidden relative border-2 ${isFocused ? "border-blue-500/50" : "border-transparent transition-colors duration-500"}`}>
@@ -917,7 +915,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
       {/* Terminal (bottom) */}
       <div style={{ height: `${100 - splitPct}%` }} className="min-h-0 relative">
-        <div ref={containerRef} className={`h-full ${textareaMode ? "invisible" : ""}`} />
+        <div
+          ref={containerRef}
+          className={`h-full ${textareaMode ? "invisible" : ""}`}
+          onPaste={(e) => handleImagePaste(e as unknown as ClipboardEvent, "terminal")}
+        />
         {textareaMode && (
           <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
             <div className="flex items-center justify-between px-2 py-1 text-xs text-gray-400 border-b border-gray-700 shrink-0">
@@ -927,6 +929,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
               ref={textareaRef}
               value={textareaValue}
               onChange={(e) => setTextareaValue(e.target.value)}
+              onPaste={(e) => handleImagePaste(e, "textarea")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
