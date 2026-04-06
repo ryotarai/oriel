@@ -56,7 +56,7 @@ export default function App() {
   const [tabs, setTabs] = useState<TabConfig[]>([makeTab("Tab 1", "")]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
   const [showSettings, setShowSettings] = useState(false);
-  const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean }>({ swapEnterKeys: true });
+  const [appConfig, setAppConfig] = useState<{ swapEnterKeys: boolean; swapPaneWidthOnFocus: boolean }>({ swapEnterKeys: true, swapPaneWidthOnFocus: false });
   const paneRefs = useRef<Map<string, SessionPanelHandle>>(new Map());
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
@@ -169,7 +169,12 @@ export default function App() {
             const handle = paneRefs.current.get(targetPane.id);
             if (handle) {
               handle.focus();
-              updateActiveTab((tab) => ({ ...tab, activePaneIndex: idx }));
+              updateActiveTab((tab) => {
+                const splits = appConfig.swapPaneWidthOnFocus
+                  ? swapPaneSplits(tab.splits, tab.panes.length, tab.activePaneIndex, idx)
+                  : tab.splits;
+                return { ...tab, activePaneIndex: idx, splits };
+              });
             }
           }
         }
@@ -186,12 +191,17 @@ export default function App() {
       const handle = paneRefs.current.get(targetPane.id);
       if (handle) {
         handle.focus();
-        updateActiveTab((tab) => ({ ...tab, activePaneIndex: targetIndex }));
+        updateActiveTab((tab) => {
+          const splits = appConfig.swapPaneWidthOnFocus
+            ? swapPaneSplits(tab.splits, tab.panes.length, tab.activePaneIndex, targetIndex)
+            : tab.splits;
+          return { ...tab, activePaneIndex: targetIndex, splits };
+        });
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeTab, tabs]);
+  }, [activeTab, tabs, appConfig]);
 
   // Helper to update the active tab
   const updateActiveTab = useCallback((updater: (tab: TabConfig) => TabConfig) => {
@@ -353,7 +363,12 @@ export default function App() {
                       if (handle) paneRefs.current.set(pane.id, handle);
                       else paneRefs.current.delete(pane.id);
                     }}
-                    onFocus={() => updateActiveTab((tab) => ({ ...tab, activePaneIndex: i }))}
+                    onFocus={() => updateActiveTab((tab) => {
+                      const splits = appConfig.swapPaneWidthOnFocus
+                        ? swapPaneSplits(tab.splits, tab.panes.length, tab.activePaneIndex, i)
+                        : tab.splits;
+                      return { ...tab, activePaneIndex: i, splits };
+                    })}
                   />
                 ))}
               </div>
@@ -384,6 +399,19 @@ function computeWidths(count: number, splits: number[]): number[] {
     widths.push((points[i + 1] ?? 100) - (points[i] ?? 0));
   }
   return widths;
+}
+
+function swapPaneSplits(splits: number[], count: number, indexA: number, indexB: number): number[] {
+  if (indexA === indexB) return splits;
+  const widths = computeWidths(count, splits);
+  [widths[indexA], widths[indexB]] = [widths[indexB], widths[indexA]];
+  const newSplits: number[] = [];
+  let cumulative = 0;
+  for (let i = 0; i < widths.length - 1; i++) {
+    cumulative += widths[i];
+    newSplits.push(cumulative);
+  }
+  return newSplits;
 }
 
 interface PaneWithDividerProps {
