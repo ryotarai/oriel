@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/ryotarai/oriel/internal/dirs"
 )
 
 type Config struct {
@@ -18,8 +20,7 @@ var (
 )
 
 func configPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "oriel", "config.json")
+	return filepath.Join(dirs.ConfigDir(), "config.json")
 }
 
 func Load() {

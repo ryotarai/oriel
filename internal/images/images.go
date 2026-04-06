@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ryotarai/oriel/internal/dirs"
 )
 
 const maxImageSize = 10 * 1024 * 1024 // 10 MB
@@ -70,12 +72,7 @@ func HandleSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build save directory.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		http.Error(w, "cannot determine home directory", http.StatusInternalServerError)
-		return
-	}
-	dir := filepath.Join(home, ".local", "oriel", "images")
+	dir := filepath.Join(dirs.LocalDir(), "images")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		http.Error(w, "cannot create image directory", http.StatusInternalServerError)
 		return

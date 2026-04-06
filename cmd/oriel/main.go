@@ -20,6 +20,7 @@ import (
 	"github.com/ryotarai/oriel/internal/auth"
 	"github.com/ryotarai/oriel/internal/commits"
 	"github.com/ryotarai/oriel/internal/config"
+	"github.com/ryotarai/oriel/internal/dirs"
 	"github.com/ryotarai/oriel/internal/fileexplorer"
 	"github.com/ryotarai/oriel/internal/images"
 	"github.com/ryotarai/oriel/internal/state"
@@ -61,8 +62,8 @@ func main() {
 	stderrHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slogLevel})
 
 	// Set up debug log file: captures all levels (debug and above)
-	if home, err := os.UserHomeDir(); err == nil {
-		logDir := filepath.Join(home, ".local", "oriel")
+	{
+		logDir := dirs.LocalDir()
 		os.MkdirAll(logDir, 0o755)
 		logPath := filepath.Join(logDir, "debug.log")
 		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
@@ -76,8 +77,6 @@ func main() {
 			slog.SetDefault(slog.New(multiHandler{stderrHandler, fileHandler}))
 			slog.Debug("Debug log enabled", "path", logPath)
 		}
-	} else {
-		slog.SetDefault(slog.New(stderrHandler))
 	}
 
 	dbPath := *stateDB

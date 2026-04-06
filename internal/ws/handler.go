@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/ryotarai/oriel/internal/conversation"
 	"github.com/ryotarai/oriel/internal/diff"
+	"github.com/ryotarai/oriel/internal/dirs"
 	ptylib "github.com/ryotarai/oriel/internal/pty"
 	"github.com/ryotarai/oriel/internal/state"
 )
@@ -200,8 +201,8 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	allArgs := []string{"--append-system-prompt", appendSystemPrompt}
 
 	// Add images directory to Claude's allowed dirs so pasted images don't require permission prompts.
-	if home, err := os.UserHomeDir(); err == nil {
-		imagesDir := filepath.Join(home, ".local", "oriel", "images")
+	{
+		imagesDir := filepath.Join(dirs.LocalDir(), "images")
 		if err := os.MkdirAll(imagesDir, 0o700); err != nil {
 			slog.Warn("Failed to create images directory", "path", imagesDir, "error", err)
 		} else {
