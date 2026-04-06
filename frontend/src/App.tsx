@@ -363,12 +363,7 @@ export default function App() {
                       if (handle) paneRefs.current.set(pane.id, handle);
                       else paneRefs.current.delete(pane.id);
                     }}
-                    onFocus={() => updateActiveTab((tab) => {
-                      const splits = appConfig.swapPaneWidthOnFocus
-                        ? swapPaneSplits(tab.splits, tab.panes.length, tab.activePaneIndex, i)
-                        : tab.splits;
-                      return { ...tab, activePaneIndex: i, splits };
-                    })}
+                    onFocus={() => { if (tab.activePaneIndex !== i || appConfig.swapPaneWidthOnFocus) updateActiveTab((t) => { const splits = appConfig.swapPaneWidthOnFocus ? swapPaneSplits(t.splits, t.panes.length, t.activePaneIndex, i) : t.splits; return { ...t, activePaneIndex: i, splits }; }); }}
                   />
                 ))}
               </div>
