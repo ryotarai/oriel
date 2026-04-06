@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/ryotarai/oriel/internal/dirs"
 )
 
 type Tab struct {
@@ -31,8 +33,7 @@ type Store struct {
 
 // DefaultPath returns the default state database path: ~/.config/oriel/state.sqlite3
 func DefaultPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "oriel", "state.sqlite3")
+	return filepath.Join(dirs.ConfigDir(), "state.sqlite3")
 }
 
 func Open(path string) (*Store, error) {
