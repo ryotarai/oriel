@@ -118,6 +118,8 @@ type Handler struct {
 	token      string
 	mu         sync.Mutex
 	sessions   map[string]*session
+	launchMu   sync.Mutex
+	lastLaunch time.Time
 }
 
 var validSessionIDRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
@@ -241,6 +243,16 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 		"EDITOR=" + scriptPath,
 		"VISUAL=" + scriptPath,
 	}
+
+	// Throttle concurrent Claude launches to avoid startup conflicts.
+	// When multiple sessions resume simultaneously (e.g. after restart), each
+	// launch is delayed so that consecutive starts are at least 500 ms apart.
+	h.launchMu.Lock()
+	if elapsed := time.Since(h.lastLaunch); elapsed < 500*time.Millisecond {
+		time.Sleep(500*time.Millisecond - elapsed)
+	}
+	h.lastLaunch = time.Now()
+	h.launchMu.Unlock()
 
 	ptySess, err := ptylib.NewSession(h.command, s.cols, s.rows, cwd, extraEnv, allArgs...)
 	if err != nil {
