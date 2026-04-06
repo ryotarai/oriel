@@ -1674,8 +1674,10 @@ const TextareaOverlay = React.memo(function TextareaOverlay({
   // Sync textareaValue when the parent opens the overlay with a new initial value
   // (e.g. editor_open message from WebSocket).
   useEffect(() => {
-    setTextareaValue(initialValue);
-  }, [initialValue]);
+    if (textareaMode) {
+      setTextareaValue(initialValue);
+    }
+  }, [initialValue, textareaMode]);
 
   // Focus textarea whenever the overlay becomes visible
   useEffect(() => {
