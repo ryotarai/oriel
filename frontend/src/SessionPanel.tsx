@@ -1074,11 +1074,7 @@ function MarkdownContent({ text, onOpenFile }: { text: string; onOpenFile?: (pat
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (href) window.open(href, "_blank", "noopener,noreferrer");
-              }}
+              onMouseDown={(e) => e.preventDefault()}
             >
               {children}
             </a>
