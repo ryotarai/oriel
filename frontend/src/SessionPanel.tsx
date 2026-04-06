@@ -272,6 +272,21 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           }
           const entry = typeof msg.entry === "string" ? JSON.parse(msg.entry) : msg.entry;
           handleConversation(entry);
+        } else if (msg.type === "conversation_batch" && msg.entries) {
+          if (msg.epoch !== undefined && msg.epoch < convEpoch.current) {
+            return;
+          }
+          const newEntries: ConversationEntry[] = [];
+          for (const raw of msg.entries) {
+            const entry: ConversationEntry = typeof raw === "string" ? JSON.parse(raw) : raw;
+            if (seenUUIDs.current.has(entry.uuid)) continue;
+            seenUUIDs.current.add(entry.uuid);
+            if (entry.isThinking) continue;
+            newEntries.push(entry);
+          }
+          if (newEntries.length > 0) {
+            setEntries((prev) => [...prev, ...newEntries]);
+          }
         } else if (msg.type === "running") {
           setRunning(msg.data === "true");
         } else if (msg.type === "suggestions_loading") {

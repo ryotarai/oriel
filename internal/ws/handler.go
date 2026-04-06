@@ -33,12 +33,13 @@ When creating or entering a git worktree, you MUST use the EnterWorktree tool. W
 </critical_rules>`
 
 type message struct {
-	Type  string          `json:"type"`
-	Data  string          `json:"data,omitempty"`
-	Cols  int             `json:"cols,omitempty"`
-	Rows  int             `json:"rows,omitempty"`
-	Entry json.RawMessage `json:"entry,omitempty"`
-	Epoch uint64          `json:"epoch,omitempty"`
+	Type    string            `json:"type"`
+	Data    string            `json:"data,omitempty"`
+	Cols    int               `json:"cols,omitempty"`
+	Rows    int               `json:"rows,omitempty"`
+	Entry   json.RawMessage   `json:"entry,omitempty"`
+	Entries []json.RawMessage `json:"entries,omitempty"`
+	Epoch   uint64            `json:"epoch,omitempty"`
 }
 
 const ptyOutputBufSize = 256 * 1024 // 256 KiB ring buffer for PTY output replay
@@ -399,6 +400,7 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 	var pendingEnterWorktreeToolID string
 
 	for {
+		// Wait for first entry
 		select {
 		case entry, ok := <-convCh:
 			if !ok {
@@ -421,48 +423,36 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 				continue
 			}
 
-			// Detect EnterWorktree/ExitWorktree tool calls
-			if entry.Type == "tool_use" && entry.ToolName == "EnterWorktree" {
-				slog.Debug("Detected EnterWorktree tool call", "session", s.id, "toolUseID", entry.ToolUseID)
-				pendingEnterWorktreeToolID = entry.ToolUseID
-			}
-			if entry.Type == "tool_use" && entry.ToolName == "ExitWorktree" {
-				slog.Debug("Detected ExitWorktree tool call", "session", s.id)
-				s.mu.Lock()
-				s.worktreeDir = ""
-				s.mu.Unlock()
-				h.broadcast(s, message{Type: "worktree_changed", Data: ""})
-				// Notify file watcher to switch back to original cwd
+			// Collect this entry and drain any immediately available entries (batching)
+			batch := []conversation.ConversationEntry{entry}
+		drainLoop:
+			for {
 				select {
-				case s.worktreeDirChanged <- "":
-				default:
-				}
-			}
-			// After EnterWorktree, the tool_result carries the new cwd
-			if pendingEnterWorktreeToolID != "" && entry.Type == "tool_result" && entry.ToolUseID == pendingEnterWorktreeToolID {
-				if entry.CWD != "" {
-					slog.Debug("Worktree entered", "session", s.id, "dir", entry.CWD)
-					s.mu.Lock()
-					s.worktreeDir = entry.CWD
-					s.mu.Unlock()
-					h.broadcast(s, message{Type: "worktree_changed", Data: entry.CWD})
-					// Notify file watcher to switch to worktree directory
-					select {
-					case s.worktreeDirChanged <- entry.CWD:
-					default:
+				case next, ok := <-convCh:
+					if !ok {
+						break drainLoop
 					}
+					if next.Type == "reset" {
+						// Flush current batch before processing reset
+						h.processBatchWorktree(s, batch, &pendingEnterWorktreeToolID)
+						h.sendConversationBatch(s, batch, epoch)
+						batch = nil
+						s.mu.Lock()
+						s.convHistory = nil
+						s.mu.Unlock()
+						h.broadcast(s, message{Type: "conversation_reset"})
+						continue
+					}
+					batch = append(batch, next)
+				default:
+					break drainLoop
 				}
-				pendingEnterWorktreeToolID = ""
 			}
 
-			entryJSON, err := json.Marshal(entry)
-			if err != nil {
-				continue
+			if len(batch) > 0 {
+				h.processBatchWorktree(s, batch, &pendingEnterWorktreeToolID)
+				h.sendConversationBatch(s, batch, epoch)
 			}
-			s.mu.Lock()
-			s.convHistory = append(s.convHistory, entry)
-			s.mu.Unlock()
-			h.broadcast(s, message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
 
 			// After first real conversation entry, broadcast the UUID to save to DB.
 			if !uuidBroadcast {
@@ -477,6 +467,79 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+// processBatchWorktree scans a batch of entries for EnterWorktree/ExitWorktree tool calls
+// and updates session worktree state accordingly.
+func (h *Handler) processBatchWorktree(s *session, batch []conversation.ConversationEntry, pendingEnterWorktreeToolID *string) {
+	for _, batchEntry := range batch {
+		if batchEntry.Type == "tool_use" && batchEntry.ToolName == "EnterWorktree" {
+			slog.Debug("Detected EnterWorktree tool call", "session", s.id, "toolUseID", batchEntry.ToolUseID)
+			*pendingEnterWorktreeToolID = batchEntry.ToolUseID
+		}
+		if batchEntry.Type == "tool_use" && batchEntry.ToolName == "ExitWorktree" {
+			slog.Debug("Detected ExitWorktree tool call", "session", s.id)
+			s.mu.Lock()
+			s.worktreeDir = ""
+			s.mu.Unlock()
+			h.broadcast(s, message{Type: "worktree_changed", Data: ""})
+			// Notify file watcher to switch back to original cwd
+			select {
+			case s.worktreeDirChanged <- "":
+			default:
+			}
+		}
+		// After EnterWorktree, the tool_result carries the new cwd
+		if *pendingEnterWorktreeToolID != "" && batchEntry.Type == "tool_result" && batchEntry.ToolUseID == *pendingEnterWorktreeToolID {
+			if batchEntry.CWD != "" {
+				slog.Debug("Worktree entered", "session", s.id, "dir", batchEntry.CWD)
+				s.mu.Lock()
+				s.worktreeDir = batchEntry.CWD
+				s.mu.Unlock()
+				h.broadcast(s, message{Type: "worktree_changed", Data: batchEntry.CWD})
+				// Notify file watcher to switch to worktree directory
+				select {
+				case s.worktreeDirChanged <- batchEntry.CWD:
+				default:
+				}
+			}
+			*pendingEnterWorktreeToolID = ""
+		}
+	}
+}
+
+// sendConversationBatch appends entries to session history and broadcasts them
+// as a batch message (or as a single message if there is only one entry).
+func (h *Handler) sendConversationBatch(s *session, batch []conversation.ConversationEntry, epoch uint64) {
+	if len(batch) == 0 {
+		return
+	}
+
+	s.mu.Lock()
+	if s.convEpoch != epoch {
+		s.mu.Unlock()
+		return
+	}
+	s.convHistory = append(s.convHistory, batch...)
+	s.mu.Unlock()
+
+	if len(batch) == 1 {
+		entryJSON, err := json.Marshal(batch[0])
+		if err != nil {
+			return
+		}
+		h.broadcast(s, message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
+	} else {
+		entriesJSON := make([]json.RawMessage, 0, len(batch))
+		for _, entry := range batch {
+			entryJSON, err := json.Marshal(entry)
+			if err != nil {
+				continue
+			}
+			entriesJSON = append(entriesJSON, entryJSON)
+		}
+		h.broadcast(s, message{Type: "conversation_batch", Entries: entriesJSON, Epoch: epoch})
 	}
 }
 
@@ -1089,13 +1152,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Replay conversation history
-	for _, entry := range history {
-		entryJSON, err := json.Marshal(entry)
-		if err != nil {
-			continue
+	// Replay conversation history as a single batch
+	if len(history) > 0 {
+		entriesJSON := make([]json.RawMessage, 0, len(history))
+		for _, entry := range history {
+			entryJSON, err := json.Marshal(entry)
+			if err != nil {
+				continue
+			}
+			entriesJSON = append(entriesJSON, entryJSON)
 		}
-		sub.writeJSON(message{Type: "conversation", Entry: entryJSON, Epoch: epoch})
+		sub.writeJSON(message{Type: "conversation_batch", Entries: entriesJSON, Epoch: epoch})
 	}
 
 	// Replay discovered Claude session UUID so the frontend can update its state
