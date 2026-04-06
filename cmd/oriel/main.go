@@ -21,6 +21,7 @@ import (
 	"github.com/ryotarai/oriel/internal/commits"
 	"github.com/ryotarai/oriel/internal/config"
 	"github.com/ryotarai/oriel/internal/fileexplorer"
+	"github.com/ryotarai/oriel/internal/images"
 	"github.com/ryotarai/oriel/internal/state"
 	"github.com/ryotarai/oriel/internal/ws"
 )
@@ -132,6 +133,7 @@ func main() {
 	mux.HandleFunc("/api/commits/show", commits.HandleShow)
 	mux.HandleFunc("/api/state", handler.HandleLoadState)
 	mux.HandleFunc("/api/state/save", handler.HandleSaveState)
+	mux.HandleFunc("/api/images/save", images.HandleSave)
 	mux.Handle("/", http.FileServer(http.FS(distFS)))
 
 	url := fmt.Sprintf("http://%s/?token=%s", *listenAddr, token)
