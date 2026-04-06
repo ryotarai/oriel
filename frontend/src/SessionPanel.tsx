@@ -149,6 +149,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
 
       e.preventDefault();
 
+      if (mode === "terminal") {
+        // Send an empty bracketed paste sequence (ESC[200~ ESC[201~).
+        // Claude Code CLI detects isPasted:true && input.length===0 and calls
+        // checkClipboardForImage(), which reads the image from the OS clipboard
+        // directly via osascript — no file saving needed on our side.
+        sendInputToTerminal("\x1b[200~\x1b[201~");
+        return;
+      }
+
+      // textarea mode: save image to disk and insert the file path at cursor.
       const MAX = 10 * 1024 * 1024;
       if (imageFile.size > MAX) {
         showToast("Image exceeds 10 MB limit");
@@ -167,20 +177,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         }
         const { path } = await res.json() as { path: string };
 
-        if (mode === "terminal") {
-          sendInputToTerminal(path);
-        } else {
-          const ta = textareaRef.current;
-          if (!ta) return;
-          const start = ta.selectionStart ?? ta.value.length;
-          const end = ta.selectionEnd ?? ta.value.length;
-          const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
-          setTextareaValue(newValue);
-          requestAnimationFrame(() => {
-            ta.selectionStart = start + path.length;
-            ta.selectionEnd = start + path.length;
-          });
-        }
+        const ta = textareaRef.current;
+        if (!ta) return;
+        const start = ta.selectionStart ?? ta.value.length;
+        const end = ta.selectionEnd ?? ta.value.length;
+        const newValue = ta.value.slice(0, start) + path + ta.value.slice(end);
+        setTextareaValue(newValue);
+        requestAnimationFrame(() => {
+          ta.selectionStart = start + path.length;
+          ta.selectionEnd = start + path.length;
+        });
       } catch {
         showToast("Failed to save image");
       }
