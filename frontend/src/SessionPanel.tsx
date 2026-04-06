@@ -159,7 +159,7 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
       formData.append("image", imageFile);
 
       try {
-        const res = await fetch("/api/images/save", { method: "POST", body: formData });
+        const res = await fetch("/api/images/save", { method: "POST", body: formData, credentials: "include" });
         if (!res.ok) {
           const text = await res.text();
           showToast(`Failed to save image: ${text}`);
@@ -187,6 +187,11 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     },
     [sendInputToTerminal, showToast, textareaRef]
   );
+
+  // Keep a ref to the latest handleImagePaste so it can be used in the xterm init effect
+  // without needing to re-initialize the terminal when the callback changes.
+  const handleImagePasteRef = useRef(handleImagePaste);
+  useEffect(() => { handleImagePasteRef.current = handleImagePaste; }, [handleImagePaste]);
 
   useEffect(() => {
     return () => {
@@ -379,6 +384,13 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
     });
     term.textarea?.addEventListener("blur", () => {
       term.options.cursorBlink = false;
+    });
+
+    // Handle image paste in terminal mode. We attach directly to term.textarea because
+    // xterm calls stopPropagation() on paste events, preventing them from reaching
+    // the container div. Handlers on the same element are not blocked by stopPropagation().
+    term.textarea?.addEventListener("paste", (e: ClipboardEvent) => {
+      handleImagePasteRef.current(e, "terminal");
     });
 
     const observer = new ResizeObserver(() => fit.fit());
@@ -918,7 +930,6 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         <div
           ref={containerRef}
           className={`h-full ${textareaMode ? "invisible" : ""}`}
-          onPaste={(e) => handleImagePaste(e as unknown as ClipboardEvent, "terminal")}
         />
         {textareaMode && (
           <div className="absolute inset-0 flex flex-col" style={{ background: "#0a0a0f" }}>
