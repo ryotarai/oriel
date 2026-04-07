@@ -8,13 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 	"github.com/ryotarai/oriel/internal/conversation"
 	"github.com/ryotarai/oriel/internal/diff"
@@ -26,7 +26,6 @@ import (
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
-
 
 const appendSystemPrompt = `<critical_rules>
 When creating or entering a git worktree, you MUST use the EnterWorktree tool. When leaving a git worktree, you MUST use the ExitWorktree tool. NEVER use raw "git worktree add" + "cd" commands manually. This is critical for the UI to track your working directory correctly.
@@ -163,11 +162,11 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 	}
 
 	s := &session{
-		id:        id,
-		subs:      make(map[*subscriber]struct{}),
-		cols:      120,
-		rows:      40,
-		cwd:       cwd,
+		id:                 id,
+		subs:               make(map[*subscriber]struct{}),
+		cols:               120,
+		rows:               40,
+		cwd:                cwd,
 		restartCh:          make(chan restartRequest, 1),
 		worktreeDirChanged: make(chan string, 1),
 	}
@@ -284,7 +283,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	}()
 	go h.watchConversation(s, watchCtx, "")
 
-	go h.startFileWatcher(s, ptySess.Done())
+	go h.startChangePoller(s, ptySess.Done())
 
 	return nil
 }
@@ -553,14 +552,22 @@ func (h *Handler) sendConversationBatch(s *session, batch []conversation.Convers
 	}
 }
 
-func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		slog.Error("Failed to start file watcher", "session", s.id, "error", err)
-		return
+func computeDirState(dir string) string {
+	var parts []string
+	for _, args := range [][]string{
+		{"rev-parse", "HEAD"},
+		{"diff", "--stat", "HEAD"},
+		{"ls-files", "--others", "--exclude-standard"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, _ := cmd.Output()
+		parts = append(parts, string(out))
 	}
-	defer watcher.Close()
+	return strings.Join(parts, "\n---\n")
+}
 
+func (h *Handler) startChangePoller(s *session, done <-chan struct{}) {
 	s.mu.Lock()
 	dir := s.worktreeDir
 	if dir == "" {
@@ -568,60 +575,33 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 	}
 	s.mu.Unlock()
 
-	if err := watcher.Add(dir); err != nil {
-		slog.Warn("Failed to watch directory", "session", s.id, "dir", dir, "error", err)
-		return
-	}
-	slog.Debug("Watching directory for file changes", "session", s.id, "dir", dir)
+	lastState := computeDirState(dir)
 
-	var debounceTimer *time.Timer
+	check := func() {
+		state := computeDirState(dir)
+		if state != lastState {
+			lastState = state
+			h.broadcast(s, message{Type: "files_changed", Data: dir})
+		}
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-done:
-			if debounceTimer != nil {
-				debounceTimer.Stop()
-			}
 			return
 		case newDir := <-s.worktreeDirChanged:
-			// Switch watched directory when worktree changes
-			_ = watcher.Remove(dir)
-			targetDir := newDir
-			if targetDir == "" {
-				targetDir = s.cwd
+			if newDir == "" {
+				newDir = s.cwd
 			}
-			if err := watcher.Add(targetDir); err != nil {
-				slog.Warn("Failed to watch directory", "session", s.id, "dir", targetDir, "error", err)
-			} else {
-				dir = targetDir
-				slog.Debug("Switched file watcher directory", "session", s.id, "dir", dir)
-			}
-			// Trigger immediate refresh since directory changed
-			h.broadcast(s, message{Type: "files_changed"})
-		case ev, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			// Only react to meaningful file operations (not Chmod)
-			if !ev.Has(fsnotify.Create) && !ev.Has(fsnotify.Write) && !ev.Has(fsnotify.Remove) && !ev.Has(fsnotify.Rename) {
-				continue
-			}
-			// Skip .git internal changes to avoid feedback loop with git commands
-			if strings.HasPrefix(filepath.Base(ev.Name), ".git") {
-				continue
-			}
-			// Debounce: reset timer on each event
-			if debounceTimer != nil {
-				debounceTimer.Stop()
-			}
-			debounceTimer = time.AfterFunc(1*time.Second, func() {
-				h.broadcast(s, message{Type: "files_changed"})
-			})
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			slog.Warn("File watcher error", "session", s.id, "error", err)
+			dir = newDir
+			// Reset state and trigger immediate refresh
+			lastState = computeDirState(dir)
+			h.broadcast(s, message{Type: "files_changed", Data: dir})
+		case <-ticker.C:
+			check()
 		}
 	}
 }
@@ -714,6 +694,16 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 
 	// Notify frontend that Claude has stopped (idle)
 	h.broadcast(s, message{Type: "running", Data: "false"})
+
+	// Trigger immediate git state check so diff/files/commits tabs update without
+	// waiting for the next polling interval.
+	s.mu.Lock()
+	dir := s.worktreeDir
+	if dir == "" {
+		dir = s.cwd
+	}
+	s.mu.Unlock()
+	h.broadcast(s, message{Type: "files_changed", Data: dir})
 
 	// Notify frontend that suggestions are being generated
 	h.broadcast(s, message{Type: "suggestions_loading"})
@@ -1017,7 +1007,7 @@ func (h *Handler) HandleSaveState(w http.ResponseWriter, r *http.Request) {
 		panes[i] = state.Pane{
 			ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
 			ClaudeSessionID: p.ClaudeSessionID,
-			Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
+			Cwd:             p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 		}
 	}
 
@@ -1078,7 +1068,7 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 			tabPanes = append(tabPanes, paneJSON{
 				ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
 				ClaudeSessionID: p.ClaudeSessionID,
-				Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
+				Cwd:             p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 			})
 		}
 		// Skip tabs with no remaining panes
@@ -1187,12 +1177,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sub.writeJSON(message{Type: "claude_session_id", Data: claudeSessID})
 	}
 
-	// Send resolved cwd to client
+	// Send resolved cwd and worktreeDir to client
 	s.mu.Lock()
 	resolvedCwd := s.cwd
+	worktree := s.worktreeDir
 	s.mu.Unlock()
 	if resolvedCwd != "" {
 		sub.writeJSON(message{Type: "cwd", Data: resolvedCwd})
+	}
+	if worktree != "" {
+		sub.writeJSON(message{Type: "worktree_changed", Data: worktree})
 	}
 
 	if exited {
