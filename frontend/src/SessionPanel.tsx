@@ -268,17 +268,9 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setSuggestionsLoading(false);
           setWorktreeDir("");
         } else if (msg.type === "worktree_changed") {
-          const newDir = msg.data || "";
-          setWorktreeDir(newDir);
-          // Also refresh diff/files/commits for the new worktree dir
-          if (newDir) {
-            const cwdParam = `&cwd=${encodeURIComponent(newDir)}`;
-            fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
-              .then((r) => r.ok ? r.json() : null)
-              .then((data) => { setDiffFiles(data?.files ?? []); })
-              .catch(() => {});
-          }
-          setRefreshTrigger(c => c + 1);
+          setWorktreeDir(msg.data || "");
+          // files_changed will follow immediately from the backend poller,
+          // which carries the correct dir and triggers a diff/files/commits refresh.
         } else if (msg.type === "cwd" && msg.data) {
           onCwdChangeRef.current?.(msg.data);
         } else if (msg.type === "claude_session_id" && msg.data) {
