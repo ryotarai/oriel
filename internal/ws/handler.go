@@ -27,7 +27,6 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-
 const appendSystemPrompt = `<critical_rules>
 When creating or entering a git worktree, you MUST use the EnterWorktree tool. When leaving a git worktree, you MUST use the ExitWorktree tool. NEVER use raw "git worktree add" + "cd" commands manually. This is critical for the UI to track your working directory correctly.
 </critical_rules>`
@@ -159,11 +158,11 @@ func (h *Handler) getOrCreateSession(id string, cwd string, resumeID string) (*s
 	}
 
 	s := &session{
-		id:        id,
-		subs:      make(map[*subscriber]struct{}),
-		cols:      120,
-		rows:      40,
-		cwd:       cwd,
+		id:                 id,
+		subs:               make(map[*subscriber]struct{}),
+		cols:               120,
+		rows:               40,
+		cwd:                cwd,
 		restartCh:          make(chan restartRequest, 1),
 		worktreeDirChanged: make(chan string, 1),
 	}
@@ -1012,7 +1011,7 @@ func (h *Handler) HandleSaveState(w http.ResponseWriter, r *http.Request) {
 		panes[i] = state.Pane{
 			ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
 			ClaudeSessionID: p.ClaudeSessionID,
-			Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
+			Cwd:             p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 		}
 	}
 
@@ -1073,7 +1072,7 @@ func (h *Handler) HandleLoadState(w http.ResponseWriter, r *http.Request) {
 			tabPanes = append(tabPanes, paneJSON{
 				ID: p.ID, TabID: p.TabID, SessionID: p.SessionID,
 				ClaudeSessionID: p.ClaudeSessionID,
-				Cwd: p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
+				Cwd:             p.Cwd, WorktreeDir: p.WorktreeDir, Position: p.Position,
 			})
 		}
 		// Skip tabs with no remaining panes
@@ -1176,12 +1175,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sub.writeJSON(message{Type: "claude_session_id", Data: claudeSessID})
 	}
 
-	// Send resolved cwd to client
+	// Send resolved cwd and worktreeDir to client
 	s.mu.Lock()
 	resolvedCwd := s.cwd
+	worktree := s.worktreeDir
 	s.mu.Unlock()
 	if resolvedCwd != "" {
 		sub.writeJSON(message{Type: "cwd", Data: resolvedCwd})
+	}
+	if worktree != "" {
+		sub.writeJSON(message{Type: "worktree_changed", Data: worktree})
 	}
 
 	if exited {
