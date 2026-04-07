@@ -108,7 +108,11 @@ type subscriber struct {
 func (s *subscriber) writeJSON(msg message) error {
 	s.wsMu.Lock()
 	defer s.wsMu.Unlock()
-	return s.conn.WriteJSON(msg)
+	err := s.conn.WriteJSON(msg)
+	if err != nil {
+		slog.Debug("WebSocket write error", "type", msg.Type, "error", err)
+	}
+	return err
 }
 
 // Handler manages multiple pty sessions, each identified by an ID
@@ -630,6 +634,7 @@ func (h *Handler) broadcast(s *session, msg message) {
 	}
 	s.mu.Unlock()
 
+	slog.Debug("Broadcasting message", "session", s.id, "type", msg.Type, "subscribers", len(subs))
 	for _, sub := range subs {
 		sub.writeJSON(msg)
 	}
@@ -1111,6 +1116,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	cwd := r.URL.Query().Get("cwd")
 	resumeID := r.URL.Query().Get("resume")
+	slog.Debug("WebSocket connection established", "session", sessionID, "cwd", cwd, "resume", resumeID)
 	s, err := h.getOrCreateSession(sessionID, cwd, resumeID)
 	if err != nil {
 		slog.Error("Failed to start session", "session", sessionID, "error", err)
@@ -1125,6 +1131,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.Lock()
 	s.subs[sub] = struct{}{}
+	slog.Debug("Subscriber joined", "session", s.id, "subscribers", len(s.subs))
 	history := make([]conversation.ConversationEntry, len(s.convHistory))
 	copy(history, s.convHistory)
 	// Snapshot buffered PTY output for replay
@@ -1141,6 +1148,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		s.mu.Lock()
 		delete(s.subs, sub)
+		slog.Debug("Subscriber left", "session", s.id, "subscribers", len(s.subs))
 		// Cancel pending editor if this was the last subscriber
 		if len(s.subs) == 0 && s.editorDoneCh != nil {
 			s.editorDoneCh <- editorResult{Cancelled: true}
@@ -1152,6 +1160,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Replay buffered PTY output so the terminal is not blank on reconnect
 	if len(ptySnapshot) > 0 {
+		slog.Debug("Replaying PTY output", "session", s.id, "bytes", len(ptySnapshot))
 		sub.writeJSON(message{
 			Type: "output",
 			Data: base64.StdEncoding.EncodeToString(ptySnapshot),
@@ -1160,6 +1169,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Replay conversation history as a single batch
 	if len(history) > 0 {
+		slog.Debug("Replaying conversation history", "session", s.id, "entries", len(history))
 		entriesJSON := make([]json.RawMessage, 0, len(history))
 		for _, entry := range history {
 			entryJSON, err := json.Marshal(entry)
@@ -1173,6 +1183,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Replay discovered Claude session UUID so the frontend can update its state
 	if claudeSessID != "" {
+		slog.Debug("Replaying claude session ID", "session", s.id)
 		sub.writeJSON(message{Type: "claude_session_id", Data: claudeSessID})
 	}
 
@@ -1185,6 +1196,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if exited {
+		slog.Debug("Replaying exit status", "session", s.id)
 		sub.writeJSON(message{Type: "exit"})
 		return
 	}
@@ -1193,6 +1205,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for {
 		var msg message
 		if err := conn.ReadJSON(&msg); err != nil {
+			slog.Debug("WebSocket read closed", "session", s.id, "error", err)
 			return
 		}
 
@@ -1200,6 +1213,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		pty := s.pty
 		s.mu.Unlock()
 
+		slog.Debug("WebSocket message received", "session", s.id, "type", msg.Type)
 		switch msg.Type {
 		case "input":
 			data, err := base64.StdEncoding.DecodeString(msg.Data)
@@ -1212,6 +1226,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		case "resize":
 			if msg.Cols > 0 && msg.Rows > 0 {
+				slog.Debug("Terminal resized", "session", s.id, "cols", msg.Cols, "rows", msg.Rows)
 				s.mu.Lock()
 				s.cols = uint16(msg.Cols)
 				s.rows = uint16(msg.Rows)
