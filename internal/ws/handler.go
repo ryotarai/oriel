@@ -8,13 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 	"github.com/ryotarai/oriel/internal/conversation"
 	"github.com/ryotarai/oriel/internal/diff"
@@ -279,7 +279,7 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	}()
 	go h.watchConversation(s, watchCtx, "")
 
-	go h.startFileWatcher(s, ptySess.Done())
+	go h.startChangePoller(s, ptySess.Done())
 
 	return nil
 }
@@ -548,14 +548,22 @@ func (h *Handler) sendConversationBatch(s *session, batch []conversation.Convers
 	}
 }
 
-func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		slog.Error("Failed to start file watcher", "session", s.id, "error", err)
-		return
+func computeDirState(dir string) string {
+	var parts []string
+	for _, args := range [][]string{
+		{"rev-parse", "HEAD"},
+		{"diff", "--stat", "HEAD"},
+		{"ls-files", "--others", "--exclude-standard"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, _ := cmd.Output()
+		parts = append(parts, string(out))
 	}
-	defer watcher.Close()
+	return strings.Join(parts, "\n---\n")
+}
 
+func (h *Handler) startChangePoller(s *session, done <-chan struct{}) {
 	s.mu.Lock()
 	dir := s.worktreeDir
 	if dir == "" {
@@ -563,60 +571,33 @@ func (h *Handler) startFileWatcher(s *session, done <-chan struct{}) {
 	}
 	s.mu.Unlock()
 
-	if err := watcher.Add(dir); err != nil {
-		slog.Warn("Failed to watch directory", "session", s.id, "dir", dir, "error", err)
-		return
-	}
-	slog.Debug("Watching directory for file changes", "session", s.id, "dir", dir)
+	lastState := computeDirState(dir)
 
-	var debounceTimer *time.Timer
+	check := func() {
+		state := computeDirState(dir)
+		if state != lastState {
+			lastState = state
+			h.broadcast(s, message{Type: "files_changed", Data: dir})
+		}
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-done:
-			if debounceTimer != nil {
-				debounceTimer.Stop()
-			}
 			return
 		case newDir := <-s.worktreeDirChanged:
-			// Switch watched directory when worktree changes
-			_ = watcher.Remove(dir)
-			targetDir := newDir
-			if targetDir == "" {
-				targetDir = s.cwd
+			if newDir == "" {
+				newDir = s.cwd
 			}
-			if err := watcher.Add(targetDir); err != nil {
-				slog.Warn("Failed to watch directory", "session", s.id, "dir", targetDir, "error", err)
-			} else {
-				dir = targetDir
-				slog.Debug("Switched file watcher directory", "session", s.id, "dir", dir)
-			}
-			// Trigger immediate refresh since directory changed
-			h.broadcast(s, message{Type: "files_changed"})
-		case ev, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			// Only react to meaningful file operations (not Chmod)
-			if !ev.Has(fsnotify.Create) && !ev.Has(fsnotify.Write) && !ev.Has(fsnotify.Remove) && !ev.Has(fsnotify.Rename) {
-				continue
-			}
-			// Skip .git internal changes to avoid feedback loop with git commands
-			if strings.HasPrefix(filepath.Base(ev.Name), ".git") {
-				continue
-			}
-			// Debounce: reset timer on each event
-			if debounceTimer != nil {
-				debounceTimer.Stop()
-			}
-			debounceTimer = time.AfterFunc(1*time.Second, func() {
-				h.broadcast(s, message{Type: "files_changed"})
-			})
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			slog.Warn("File watcher error", "session", s.id, "error", err)
+			dir = newDir
+			// Reset state and trigger immediate refresh
+			lastState = computeDirState(dir)
+			h.broadcast(s, message{Type: "files_changed", Data: dir})
+		case <-ticker.C:
+			check()
 		}
 	}
 }
