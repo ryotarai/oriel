@@ -268,7 +268,17 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
           setSuggestionsLoading(false);
           setWorktreeDir("");
         } else if (msg.type === "worktree_changed") {
-          setWorktreeDir(msg.data || "");
+          const newDir = msg.data || "";
+          setWorktreeDir(newDir);
+          // Also refresh diff/files/commits for the new worktree dir
+          if (newDir) {
+            const cwdParam = `&cwd=${encodeURIComponent(newDir)}`;
+            fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
+              .then((r) => r.ok ? r.json() : null)
+              .then((data) => { setDiffFiles(data?.files ?? []); })
+              .catch(() => {});
+          }
+          setRefreshTrigger(c => c + 1);
         } else if (msg.type === "cwd" && msg.data) {
           onCwdChangeRef.current?.(msg.data);
         } else if (msg.type === "claude_session_id" && msg.data) {
@@ -311,7 +321,16 @@ export const SessionPanel = forwardRef<SessionPanelHandle, SessionPanelProps>(fu
         } else if (msg.type === "suggestions_error") {
           setSuggestionsLoading(false);
         } else if (msg.type === "files_changed") {
-          fetchDiffDataRef.current();
+          const dir = msg.data;
+          if (dir) {
+            const cwdParam = `&cwd=${encodeURIComponent(dir)}`;
+            fetch(`/api/diff?session=${encodeURIComponent(sessionId)}${cwdParam}`)
+              .then((r) => r.ok ? r.json() : null)
+              .then((data) => { setDiffFiles(data?.files ?? []); })
+              .catch(() => {});
+          } else {
+            fetchDiffDataRef.current();
+          }
           setRefreshTrigger(c => c + 1);
         } else if (msg.type === "editor_open") {
           setEditorMode(true);
