@@ -687,6 +687,18 @@ func (h *Handler) HandleIdle(w http.ResponseWriter, r *http.Request) {
 	// Return 200 immediately to not block Claude Code's hook
 	w.WriteHeader(http.StatusOK)
 
+	// Trigger immediate git state check so diff/files/commits tabs update without
+	// waiting for the next polling interval.
+	go func() {
+		s.mu.Lock()
+		dir := s.worktreeDir
+		if dir == "" {
+			dir = s.cwd
+		}
+		s.mu.Unlock()
+		h.broadcast(s, message{Type: "files_changed", Data: dir})
+	}()
+
 	// Notify frontend that Claude has stopped (idle)
 	h.broadcast(s, message{Type: "running", Data: "false"})
 
