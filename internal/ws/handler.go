@@ -86,6 +86,9 @@ type session struct {
 	// Editor state: non-nil channel when an EDITOR process is waiting for user input
 	editorDoneCh chan editorResult
 
+	// Permission state: non-nil channel when a PermissionRequest hook is waiting for user input
+	permissionDoneCh chan permissionResult
+
 	// cancelWatchConv cancels the current watchConversation goroutine.
 	cancelWatchConv context.CancelFunc
 }
@@ -96,6 +99,24 @@ type restartRequest struct {
 type editorResult struct {
 	Content   string `json:"content"`
 	Cancelled bool   `json:"cancelled"`
+}
+
+type permissionRequest struct {
+	ToolName              string          `json:"tool_name"`
+	ToolInput             json.RawMessage `json:"tool_input"`
+	PermissionSuggestions json.RawMessage `json:"permission_suggestions"`
+}
+
+type permissionResult struct {
+	HookEventName string             `json:"hookEventName"`
+	Decision      permissionDecision `json:"decision"`
+}
+
+type permissionDecision struct {
+	Behavior           string          `json:"behavior"`
+	Message            string          `json:"message,omitempty"`
+	UpdatedInput       json.RawMessage `json:"updatedInput,omitempty"`
+	UpdatedPermissions json.RawMessage `json:"updatedPermissions,omitempty"`
 }
 
 type subscriber struct {
@@ -221,8 +242,9 @@ func (h *Handler) startProcess(s *session, args ...string) error {
 	settingsJSON := fmt.Sprintf(`{"hooks":{`+
 		`"Stop":[{"hooks":[{"type":"command","command":"%s idle"}]}],`+
 		`"SessionStart":[{"matcher":"clear|resume","hooks":[{"type":"command","command":"%s session-start"}]}],`+
-		`"UserPromptSubmit":[{"hooks":[{"type":"command","command":"%s prompt-submitted"}]}]`+
-		`}}`, hookScriptPath, hookScriptPath, hookScriptPath)
+		`"UserPromptSubmit":[{"hooks":[{"type":"command","command":"%s prompt-submitted"}]}],`+
+		`"PermissionRequest":[{"hooks":[{"type":"command","command":"%s permission-request"}]}]`+
+		`}}`, hookScriptPath, hookScriptPath, hookScriptPath, hookScriptPath)
 	slog.Debug("startProcess: injecting --settings", "settings", settingsJSON, "session", s.id)
 	allArgs = append(allArgs, "--settings", settingsJSON)
 
@@ -463,6 +485,23 @@ func (h *Handler) watchConversation(s *session, ctx context.Context, transcriptP
 				continue
 			}
 
+			// If a permission request is pending and the conversation advanced (tool_result or assistant text),
+			// the permission was already resolved via CLI — unblock the long-poll
+			if entry.Type == "tool_result" || (entry.Type == "assistant" && !entry.IsThinking && entry.ToolName == "") {
+				s.mu.Lock()
+				ch := s.permissionDoneCh
+				if ch != nil {
+					s.permissionDoneCh = nil
+				}
+				s.mu.Unlock()
+				if ch != nil {
+					ch <- permissionResult{
+						HookEventName: "PermissionRequest",
+						Decision:      permissionDecision{Behavior: "allow"},
+					}
+				}
+			}
+
 			// After first real conversation entry, broadcast the UUID to save to DB.
 			if !uuidBroadcast {
 				s.mu.Lock()
@@ -644,6 +683,9 @@ func (h *Handler) HandleHook(w http.ResponseWriter, r *http.Request) {
 		case "editor-open":
 			h.HandleEditorOpen(w, r)
 			return
+		case "permission-request":
+			h.HandlePermissionRequest(w, r)
+			return
 		}
 	}
 	slog.Warn("HandleHook: unrecognized path", "path", r.URL.Path)
@@ -801,6 +843,81 @@ func (h *Handler) HandleEditorOpen(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.editorDoneCh = nil
 	s.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// HandlePermissionRequest is called by Claude Code's PermissionRequest hook.
+// It long-polls until the frontend sends permission_response via WebSocket.
+func (h *Handler) HandlePermissionRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 4 {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	sessionID := parts[2]
+	if !isValidSessionID(sessionID) {
+		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
+
+	var req permissionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	h.mu.Lock()
+	s, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	s.mu.Lock()
+	if s.permissionDoneCh != nil {
+		s.mu.Unlock()
+		http.Error(w, "permission request already pending", http.StatusConflict)
+		return
+	}
+	doneCh := make(chan permissionResult, 1)
+	s.permissionDoneCh = doneCh
+	s.mu.Unlock()
+
+	type permissionRequestMsg struct {
+		ToolName              string          `json:"toolName"`
+		ToolInput             json.RawMessage `json:"toolInput"`
+		PermissionSuggestions json.RawMessage `json:"permissionSuggestions"`
+	}
+	msgData, _ := json.Marshal(permissionRequestMsg{
+		ToolName:              req.ToolName,
+		ToolInput:             req.ToolInput,
+		PermissionSuggestions: req.PermissionSuggestions,
+	})
+	h.broadcast(s, message{Type: "permission_request", Data: string(msgData)})
+
+	var result permissionResult
+	select {
+	case result = <-doneCh:
+	case <-r.Context().Done():
+		result = permissionResult{
+			HookEventName: "PermissionRequest",
+			Decision:      permissionDecision{Behavior: "deny", Message: "Request timed out"},
+		}
+	}
+
+	s.mu.Lock()
+	s.permissionDoneCh = nil
+	s.mu.Unlock()
+
+	h.broadcast(s, message{Type: "permission_request_resolved"})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
@@ -1144,7 +1261,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.editorDoneCh <- editorResult{Cancelled: true}
 			s.editorDoneCh = nil
 		}
+		// Cancel pending permission request if this was the last subscriber
+		var permCh chan permissionResult
+		if len(s.subs) == 0 && s.permissionDoneCh != nil {
+			permCh = s.permissionDoneCh
+			s.permissionDoneCh = nil
+		}
 		s.mu.Unlock()
+		if permCh != nil {
+			permCh <- permissionResult{
+				HookEventName: "PermissionRequest",
+				Decision:      permissionDecision{Behavior: "deny", Message: "All clients disconnected"},
+			}
+		}
 		close(sub.doneCh)
 	}()
 
@@ -1260,6 +1389,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.mu.Unlock()
 			if ch != nil {
 				ch <- editorResult{Cancelled: true}
+			}
+		case "permission_response":
+			s.mu.Lock()
+			ch := s.permissionDoneCh
+			if ch != nil {
+				s.permissionDoneCh = nil
+			}
+			s.mu.Unlock()
+			if ch != nil {
+				var result permissionResult
+				if err := json.Unmarshal([]byte(msg.Data), &result); err != nil {
+					slog.Warn("Failed to decode permission_response", "error", err)
+					continue
+				}
+				ch <- result
 			}
 		}
 	}
